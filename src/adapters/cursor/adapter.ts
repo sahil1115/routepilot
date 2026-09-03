@@ -128,7 +128,7 @@ export class CursorCliAdapter implements AgentAdapter {
           (process.platform === 'win32' && this.#resolvedVia === 'path'
             ? 'On Windows the installer provides only cursor-agent.cmd, which cannot be ' +
               'launched without a shell; RoutePilot looks for the node.exe and index.js it ' +
-              'wraps under %LOCALAPPDATA%\cursor-agent\versions and found neither. '
+              'wraps under %LOCALAPPDATA%\\cursor-agent\\versions and found neither. '
             : '') +
           `Note: the "cursor" editor launcher is a different program and cannot be used here. ` +
           `Underlying error: ${probe.detail || 'not available'}`,
