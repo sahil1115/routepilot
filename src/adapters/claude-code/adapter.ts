@@ -14,9 +14,10 @@
  *
  * The specification asks for a local gateway where the environment supports
  * one, and says plainly: if it does not, do not invent one — implement the
- * supported wrapper and document the limitation. That is what this is. The
- * limitation is recorded in `src/adapters/verification.ts`, and this adapter is
- * marked `unverified` until it has actually been run against the real CLI.
+ * supported wrapper and document the limitation. That is what this is. What has
+ * and has not been confirmed against the real CLI is recorded in
+ * `src/adapters/verification.ts` -- verified on 2026-09-03 for a trivial,
+ * tool-free task, and unverified for anything that needs tool permission.
  */
 
 import { randomUUID } from 'node:crypto';

@@ -164,3 +164,44 @@ describe('phase 24 behaviour is documented where it changed', () => {
     expect(contents).toMatch(/no interactive prompt/i);
   });
 });
+
+describe('the adapter docs and the verification table cannot drift apart', () => {
+  // They did. v0.3.0 flipped `claude-code` to `verified` and left
+  // `docs/CLAUDE_CODE.md` saying "Execution has never been run" -- the code and
+  // the page a user actually reads disagreeing about the one claim this project
+  // is most careful about. Nothing caught it, because every guard here checked
+  // wording rather than agreement.
+  const PAGES: Readonly<Record<string, string>> = {
+    'claude-code': 'docs/CLAUDE_CODE.md',
+    'cursor-cli': 'docs/CURSOR.md',
+  };
+
+  it.each(Object.entries(PAGES))('%s agrees with its page', async (adapterId, page) => {
+    const entry = ADAPTER_VERIFICATION.find((candidate) => candidate.adapterId === adapterId);
+    expect(entry, `no verification entry for ${adapterId}`).toBeDefined();
+
+    const contents = (await readFile(join(root, page), 'utf8')).toLowerCase();
+    const claimsUnrun = /execution has never been run|status:\s*\*\*unverified/.test(contents);
+
+    if (entry?.status === 'verified') {
+      expect(claimsUnrun, `${page} still says execution has never been run`).toBe(false);
+      // A verified adapter must show the version it was verified against, so
+      // the claim stays checkable rather than becoming an adjective.
+      expect(
+        entry?.evidence?.toolVersion,
+        'a verified adapter must record a version',
+      ).toBeDefined();
+      expect(contents).toContain((entry?.evidence?.toolVersion ?? '').toLowerCase());
+    } else {
+      expect(claimsUnrun, `${page} should say execution is unverified`).toBe(true);
+    }
+  });
+
+  it('records that tool permission is still unaddressed for Claude Code', async () => {
+    // The limitation most likely to matter for a real coding task, and the one
+    // that lived only in a source comment until Phase 25.
+    const contents = await readFile(join(root, 'docs', 'CLAUDE_CODE.md'), 'utf8');
+    expect(contents).toMatch(/permission-mode/);
+    expect(contents).toMatch(/cannot prompt/i);
+  });
+});

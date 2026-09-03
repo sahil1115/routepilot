@@ -93,11 +93,13 @@ export function syntheticObservations(
     readonly rate?: number;
     readonly taskType?: TaskType;
     readonly scope?: TaskScope;
+    readonly language?: string;
   } = {},
 ): Observation[] {
   const rate = options.rate ?? TRUE_SUCCESS_RATE[modelId] ?? 0.5;
   const taskType = options.taskType ?? 'feature-implementation';
   const scope = options.scope ?? 'few-files';
+  const language = options.language ?? 'unknown';
 
   const observations: Observation[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -107,6 +109,7 @@ export function syntheticObservations(
       modelId,
       taskType,
       scope,
+      language,
       success: success ? 1 : 0,
       evidence: 1,
     });

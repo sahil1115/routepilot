@@ -1,8 +1,13 @@
 # Cursor adapter
 
-> **Status: unavailable.** `cursor-agent` is not installed on the machine this
-> was developed on, so **nothing** about this adapter has been confirmed against
-> the real tool — not even availability detection.
+> **Status: verified, narrowly.** On 2026-09-03 the adapter ran a real task
+> against Cursor CLI 2026.09.02 and returned `completed` in 33 s. That confirms
+> availability detection, Windows shim resolution, process spawning, the
+> stream-json event schema, event normalisation and workspace-trust handling.
+>
+> **It does not confirm that a real coding task works**, and the run reported
+> **no usage data at all**, so Cursor costs are estimates rather than
+> measurements.
 
 RoutePilot drives Cursor through its documented CLI agent. It is a **wrapper**.
 
@@ -32,10 +37,18 @@ says so, because the mistake is easy and the failure is otherwise baffling.
 
 ## What has and has not been confirmed
 
-Nothing has been confirmed. The tool is not installed here.
+Confirmed on 2026-09-03 against Cursor CLI 2026.09.02: availability detection,
+version parsing, Windows shim resolution, process spawning, the stream-json
+event schema, event normalisation through to a terminal `completed`, and
+workspace-trust handling.
 
-The event schema is built from the shapes named in the specification. Because it
-has not been checked against real output, the adapter hedges:
+Not confirmed: usage reporting — the real run returned none — cancellation,
+timeouts, failure classification from real errors, and any task requiring tool
+use. The verification prompt forbids tools.
+
+The event schema was built from the shapes named in the specification. One real
+transcript has now been observed, but a single successful run is thin evidence,
+so the adapter still hedges:
 
 - both `snake_case` and `camelCase` key styles are accepted
 - unrecognised events are **ignored** rather than guessed at
@@ -67,11 +80,20 @@ neither reads nor stores them.
 
 ## Limitations
 
-1. **Nothing is confirmed.** `cursor-agent` is not installed on the development
-   machine, so not even availability detection has been observed working.
-2. **The event schema is guessed** from the specification's description. The
-   adapter accepts both key styles and ignores unrecognised events as a hedge;
-   that hedge should be removed once real output is available.
-3. **Model ids are passed through unchanged.** Whether Cursor accepts the ids in
+1. **Only a trivial, tool-free task has run.** File creation, modification,
+   terminal use and test execution are all unconfirmed.
+2. **No usage data was returned**, so cost for a Cursor run is priced from
+   estimates rather than measured. This is a real difference from the Claude
+   Code adapter, which does report usage.
+3. **The event schema was guessed** from the specification and has been seen
+   working exactly once. The adapter still accepts both key styles and ignores
+   unrecognised events; that hedge should stay until more output is observed.
+4. **On Windows the installer ships only `cursor-agent.cmd` and `.ps1`**, which
+   `execFile` cannot launch without a shell. The adapter resolves the `node.exe`
+   and `index.js` those wrap; see `windows-shim.ts`.
+5. **The adapter passes `--trust`**, which trusts the workspace the caller
+   named. It never passes `--force` or `--yolo`, which grant blanket command
+   approval; a test asserts they never reach the argument list.
+6. **Model ids are passed through unchanged.** Whether Cursor accepts the ids in
    your configuration is unverified.
-4. **Cancellation and timeout behaviour are untested** against the real tool.
+7. **Cancellation and timeout behaviour are untested** against the real tool.

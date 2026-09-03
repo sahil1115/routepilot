@@ -119,7 +119,7 @@ describe('run plans by default', () => {
 });
 
 describe('run executes when asked', () => {
-  it('carries the task to an outcome', async () => {
+  it('reports `unverified`, not `succeeded`, when nothing validated the work', async () => {
     const result = await runTask({
       ...BASE,
       route: routeResult(),
@@ -127,9 +127,16 @@ describe('run executes when asked', () => {
       execute: true,
     });
 
+    // The bug this file previously encoded: `run --execute` configures a
+    // validation engine but no commands, so every check is skipped, and a
+    // report where nothing ran used to read as passing. The task ran; nothing
+    // confirmed it did what was asked, and the outcome now says so.
     expect(result.refusal).toBeNull();
-    expect(result.run?.outcome).toBe('succeeded');
+    expect(result.run?.outcome).toBe('unverified');
     expect(result.run?.attempts.length).toBeGreaterThan(0);
+    expect(result.run?.reason).toMatch(/nothing verified it/i);
+    // And the unfounded claim never reaches scoring or learning.
+    expect(result.run?.signals?.taskCriteriaMet).toBeNull();
   });
 
   it('runs the model the plan named', async () => {

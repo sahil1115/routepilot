@@ -99,7 +99,12 @@ export class ValidationEngine {
 
     if (HEAVY_TASKS.has(taskType) || scope === 'repository-wide' || scope === 'many-files') {
       return {
-        checks: ['syntax', 'build', 'tests', 'diagnostics'],
+        // `diagnostics` is deliberately absent. It has no command form — the
+        // only command source, `commandsFromPackageScripts`, cannot supply one
+        // — so planning it guaranteed a permanently skipped check, which made
+        // every full-sweep report contain a check that could never run.
+        // Diagnostics arrive through `DiagnosticsPort`, not a shell command.
+        checks: ['syntax', 'build', 'tests'],
         rationale: `${taskType} at ${scope} scope can break anything, so the full sweep runs`,
       };
     }
@@ -142,6 +147,11 @@ export class ValidationEngine {
       results,
       // Checks that could not run cannot make a report pass or fail.
       passed: results.every((result) => result.passed !== false),
+      // ...but a report where nothing ran must not read as a passing one. This
+      // is the distinction `passed` cannot carry on its own: it answers "did
+      // anything fail", and a plan of all-skipped checks answers that with
+      // "no" while establishing nothing at all.
+      evaluated: results.some((result) => result.passed !== null),
       skipped,
     };
   }

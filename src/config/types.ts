@@ -40,6 +40,29 @@ export interface RoutingConfig {
   readonly fallbackProviderId?: string | undefined;
 }
 
+/**
+ * Settings for one agent adapter.
+ *
+ * Every field is absent by default. An absent `permissionMode` means the
+ * adapter passes no `--permission-mode` and Claude Code uses its own default,
+ * which is the only safe thing to do on a user's behalf.
+ */
+export interface AgentConfig {
+  /** Passed through as `--permission-mode`. Absent means the tool decides. */
+  readonly permissionMode?: string | undefined;
+  readonly timeoutMs?: number | undefined;
+  /** Arguments placed before the adapter's own. */
+  readonly commandArgs?: readonly string[] | undefined;
+  /** Explicit path to the CLI, when it is not on PATH. */
+  readonly command?: string | undefined;
+}
+
+/** Per-adapter settings, keyed by adapter id. */
+export interface AgentsConfig {
+  readonly 'claude-code': AgentConfig;
+  readonly 'cursor-cli': AgentConfig;
+}
+
 /** What RoutePilot does when a request cannot be served inside budget. */
 export const BUDGET_EXCEEDED_BEHAVIOURS = ['ask', 'stop', 'allow-fallback'] as const;
 
@@ -196,6 +219,7 @@ export interface RoutePilotConfig {
   readonly models: readonly ModelSpec[];
   readonly routing: RoutingConfig;
   readonly budgets: BudgetConfig;
+  readonly agents: AgentsConfig;
   readonly learning: LearningConfig;
   readonly shadow: ShadowConfig;
   readonly telemetry: TelemetryConfig;

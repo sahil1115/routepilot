@@ -334,12 +334,22 @@ export class FailureClassifier {
       });
     }
 
-    // The run changed code and the change does not build or pass tests, and
-    // the repository was fine beforehand. That is the model's doing.
+    // The run changed code and the change does not build, pass tests or even
+    // parse, and the repository was fine beforehand. That is the model's doing.
+    //
+    // `syntax` was added in Phase 25 alongside post-failure validation: a failed
+    // attempt now gets a syntax-only check, and without syntax here that
+    // evidence would have had no rule to feed. `changedFiles` is consulted
+    // beside `signals.fileChanges` because the two disagree when an agent
+    // reports edits it never emitted events for.
+    const changed = signals.fileChanges > 0 || (evidence.changedFiles?.length ?? 0) > 0;
+
     if (
-      signals.fileChanges > 0 &&
+      changed &&
       evidence.repositoryBrokenBeforeRun !== true &&
-      (validationCheckFailed(evidence, 'build') || validationCheckFailed(evidence, 'tests'))
+      (validationCheckFailed(evidence, 'build') ||
+        validationCheckFailed(evidence, 'tests') ||
+        validationCheckFailed(evidence, 'syntax'))
     ) {
       found.push({
         rule: 'weakness.broke-validation',

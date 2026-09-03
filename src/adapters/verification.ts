@@ -60,11 +60,16 @@ export interface AdapterVerification {
  * Claude Haiku 4.5 through Claude Code 2.1.72 and returned `completed`. That is
  * the first and so far only adapter to have run against a real model.
  *
- * The others are not. `cursor-cli` cannot be verified here because the tool is
- * not installed, and `direct-provider` has never been given a credential. Both
- * are implemented against documented surfaces and covered by tests that drive
- * real child processes — which proves they handle the shapes they were told to
- * expect, not that those are the shapes the tools emit.
+ * `cursor-cli` is verified too, on the same day and to the same narrow extent.
+ *
+ * `direct-provider` is not: it has never been given a credential. It is
+ * implemented against a documented surface and covered by tests that drive real
+ * child processes — which proves it handles the shapes it was told to expect,
+ * not that those are the shapes the tool emits.
+ *
+ * "Verified" here means a real task ran end to end. It does not mean an adapter
+ * is finished: both verified adapters ran a trivial, tool-free prompt, and
+ * neither has been asked to edit a file.
  */
 export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   {

@@ -102,6 +102,20 @@ export interface RunEscalation {
 /** How a run finished. */
 export const RUN_OUTCOMES = [
   'succeeded',
+  /**
+   * The agent finished and nothing contradicted it, but nothing confirmed it
+   * either — no validation check produced a verdict.
+   *
+   * Distinct from `succeeded` on purpose. Before Phase 25 this case *was*
+   * `succeeded`, because production configures no validation commands and a
+   * report where every check was skipped reads as passing. Every real run was
+   * therefore reported as a success on the agent's own word.
+   *
+   * It is deliberately not a failure: nothing went wrong, so escalating to a
+   * more expensive model would spend money on the absence of evidence rather
+   * than on evidence of absence.
+   */
+  'unverified',
   'failed',
   'stopped',
   'cancelled',
@@ -122,6 +136,16 @@ export interface RunRequest {
   readonly policy: RoutingPolicy;
   /** A model the user pinned. Honoured, and never explored away from. */
   readonly requestedModelId?: string | undefined;
+  /**
+   * Permission to execute a decision that knowingly exceeds the request budget.
+   *
+   * The runner refuses one otherwise. `src/cli/run.ts` already applies
+   * `budgets.onExceeded` before it gets here, so in the CLI this is belt and
+   * braces — but the runner is a public entry point, and a caller that hands it
+   * an over-budget decision should have to say so rather than have the budget
+   * quietly not apply.
+   */
+  readonly allowOverBudget?: boolean | undefined;
   readonly branch?: string | null | undefined;
   /** Capabilities this request genuinely needs. */
   readonly requiredCapabilities?: AgentExecutionRequest['requiredCapabilities'] | undefined;

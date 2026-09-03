@@ -196,6 +196,7 @@ export function simulate(options: SimulationOptions): SimulationResult {
         modelId: finalChoice,
         taskType: options.features.task.taskType,
         scope: options.features.task.scope,
+        language: 'unknown',
         success: succeeded ? 1 : 0,
         evidence: 1,
       },

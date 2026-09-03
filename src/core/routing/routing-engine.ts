@@ -29,7 +29,7 @@ import type {
   RoutingDecision,
   RoutingPolicy,
 } from '../types/routing.js';
-import { LearnedSuccessModel } from '../learning/success-model.js';
+import { LearnedSuccessModel, learningLanguage } from '../learning/success-model.js';
 import {
   assessExploration,
   EXPLORATION_DISABLED,
@@ -423,6 +423,7 @@ export class RoutingEngine {
         modelId: model.id,
         taskType: features.task.taskType,
         scope: features.task.scope,
+        language: learningLanguage(features.repository.primaryLanguage),
       });
       return { model, estimate, learned };
     });

@@ -30,6 +30,9 @@
  * - commit anything, ever (principle 13)
  */
 
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import type { AgentRegistry } from '../adapters/registry.js';
 import { RegistryExecutor } from '../adapters/executor.js';
 import { buildAdapters, buildableAdapterIds, type AdapterProbe } from '../adapters/build.js';
@@ -40,7 +43,11 @@ import { toEscalationLimits, toLearningPolicy } from '../config/policy.js';
 import { recordRun } from '../telemetry/recorder.js';
 import type { LocalStore } from '../telemetry/open.js';
 import type { RunResult } from '../core/types/run.js';
-import { ValidationEngine } from '../core/execution/validation.js';
+import {
+  ValidationEngine,
+  commandsFromPackageScripts,
+  type ValidationCommands,
+} from '../core/execution/validation.js';
 import { buildRegistries } from '../config/registries.js';
 import { toRoutingPolicy } from '../config/policy.js';
 import type { RoutePilotConfig } from '../config/types.js';
@@ -178,7 +185,14 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
 
   const built =
     options.registry === undefined
-      ? await buildAdapters(options.adapterId === undefined ? {} : { only: options.adapterId })
+      ? await buildAdapters({
+          // A structural copy: `AgentsConfig` names its two adapters as
+          // required keys, while `buildAdapters` takes any adapter id. Spreading
+          // keeps the config type closed -- a typo'd adapter section is still a
+          // schema error -- without forcing the builder to know the names.
+          agents: { ...config.agents },
+          ...(options.adapterId === undefined ? {} : { only: options.adapterId }),
+        })
       : { registry: options.registry, probes: options.probes ?? [] };
 
   if (options.adapterId !== undefined && !buildableAdapterIds().includes(options.adapterId)) {
@@ -224,10 +238,14 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
     // runner used built-in defaults and the budget bounded selection only.
     limits: toEscalationLimits(config),
     ...(learned === undefined ? {} : { learned }),
-    // No commands are configured, so every check reports "not run" rather than
-    // "passed". Absent is not zero: a validation that did not happen must never
-    // read as a validation that succeeded.
-    validation: new ValidationEngine({ runner: new NodeCommandRunner() }),
+    // Checks are derived from the workspace's own manifest scripts. Nothing is
+    // invented: a check is configured only where the repository declares a
+    // script for it, and a repository that declares none is validated by
+    // nothing and reports `unverified` rather than `succeeded`.
+    validation: new ValidationEngine({
+      runner: new NodeCommandRunner(),
+      commands: await validationCommands(options.workspaceRoot, options.onProblem),
+    }),
   });
 
   const run = await runner.run({
@@ -237,6 +255,11 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
     features: route.analysis.features,
     policy: toRoutingPolicy(config),
     decision: route.decision,
+    // The permission decided above, handed to the runner explicitly. The runner
+    // refuses an over-budget decision on its own, so this is where the CLI's
+    // `budgets.onExceeded` ruling actually takes effect rather than being
+    // assumed by both sides.
+    allowOverBudget: overspend !== null,
     ...(options.requestedModelId === undefined
       ? {}
       : { requestedModelId: options.requestedModelId }),
@@ -279,6 +302,43 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
     overspend,
     onBudgetExceeded: config.budgets.onExceeded,
   };
+}
+
+/**
+ * Validation commands the workspace itself declares.
+ *
+ * `commandsFromPackageScripts` has existed and been tested since Phase 6 with
+ * no production caller, so every real run planned checks and ran none — and a
+ * report where nothing ran used to read as a pass. Reading the manifest is what
+ * turns that honesty fix into an actual check.
+ *
+ * A missing or unreadable manifest is not an error: the run proceeds and
+ * reports `unverified`, which is the truth about it.
+ */
+async function validationCommands(
+  workspaceRoot: string,
+  onProblem?: (message: string) => void,
+): Promise<ValidationCommands> {
+  try {
+    const raw = await readFile(join(workspaceRoot, 'package.json'), 'utf8');
+    const manifest = JSON.parse(raw) as { scripts?: Record<string, string> };
+    const commands = commandsFromPackageScripts(manifest.scripts ?? {});
+
+    if (Object.keys(commands).length === 0) {
+      onProblem?.(
+        'this workspace declares no test, build or typecheck script, so the run ' +
+          'cannot be validated and will report "unverified".',
+      );
+    }
+    return commands;
+  } catch {
+    // No manifest, or not JSON. Nothing to derive; say so rather than guess.
+    onProblem?.(
+      'no readable package.json in this workspace, so the run cannot be ' +
+        'validated and will report "unverified".',
+    );
+    return {};
+  }
 }
 
 /**

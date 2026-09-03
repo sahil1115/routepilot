@@ -130,6 +130,20 @@ export class TaskRunner {
       return this.#finishWithoutRunning(request, decision);
     }
 
+    // A decision can knowingly exceed the request budget -- only ever an
+    // explicitly requested model, and only when the configured behaviour
+    // permits it. The CLI decides that before calling; the runner refuses
+    // otherwise, so no future caller can execute an over-budget decision by
+    // omitting a check it did not know about.
+    if (decision.budgetExceeded && request.allowOverBudget !== true) {
+      return this.#finishWithoutRunning(request, decision, {
+        outcome: 'stopped',
+        reason:
+          `"${decision.selectedModelId}" exceeds the request budget and no budget override ` +
+          `was given, so nothing was run.`,
+      });
+    }
+
     return this.#loop(request, decision, decision.selectedModelId);
   }
 
@@ -185,9 +199,23 @@ export class TaskRunner {
       lastValidation = attempt.validation ?? lastValidation;
 
       if (attempt.record.succeeded) {
+        // "Nothing failed" and "something passed" are different claims, and
+        // only the second is a success. A run nobody could check reports
+        // `unverified` and says why.
+        // `undefined` means validation was never applicable: no engine was
+        // wired, or the plan warranted no checks. That is a caller's informed
+        // choice, and the agent's verdict is the only one available.
+        //
+        // A *present* report that evaluated nothing is the different, worse
+        // case: checks were planned, none produced a verdict, and calling that
+        // a success is the bug this distinction exists to stop.
+        const verified = attempt.validation === undefined || attempt.validation.evaluated;
         return this.#finish(request, decision, attempts, escalations, totalCost, {
-          outcome: 'succeeded',
-          reason: `"${model.id}" completed the task.`,
+          outcome: verified ? 'succeeded' : 'unverified',
+          reason: verified
+            ? `"${model.id}" completed the task and validation passed.`
+            : `"${model.id}" reported completing the task, but nothing verified it: ` +
+              `${describeUnverified(attempt.validation)}.`,
           validation: attempt.validation,
         });
       }
@@ -319,12 +347,33 @@ export class TaskRunner {
     const outcome = await this.#executor.execute(executionRequest, model);
     const signals = observeAll(outcome.events, this.#clock);
 
-    // Validation only runs when the agent actually finished. Building a
-    // workspace an agent abandoned half-way tells you about the abandonment,
-    // not about the model.
+    // A finished run is validated against its full plan. A *failed* one that
+    // nonetheless edited files gets a lightweight plan instead — syntax only,
+    // never the test suite — because "the model left the workspace broken" and
+    // "the provider returned 503" are different failures with different
+    // remedies, and until Phase 25 nothing could tell them apart: validation
+    // ran only on success, so the classifier's `weakness.broke-validation`
+    // rule was unreachable on the one path it was written for.
+    //
+    // An agent that changed nothing cannot have broken anything, so that case
+    // is skipped rather than paid for.
     const validation =
-      outcome.result.status === 'completed' ? await this.#validate(request, outcome) : undefined;
+      outcome.result.status === 'completed'
+        ? await this.#validate(request, outcome)
+        : outcome.result.changedFiles.length > 0
+          ? await this.#validateAfterFailure(request)
+          : undefined;
 
+    // Success requires evidence, not merely the absence of a failing check.
+    // `validation.passed` is true for a report where nothing ran, so relying on
+    // it alone reported `succeeded` on the agent's own word — which is what
+    // every `routepilot run --execute` did, because production configured no
+    // commands at all.
+    // Deliberately does NOT require `evaluated`. An unverified run must not be
+    // treated as a failure: escalating because nothing could be checked would
+    // spend money on the absence of evidence rather than on evidence of a
+    // problem. The verified/unverified distinction is carried by the run's
+    // outcome instead, where it is visible without changing what runs next.
     const succeeded = outcome.result.status === 'completed' && (validation?.passed ?? true);
 
     const classification = this.#classifier.classify({
@@ -336,6 +385,7 @@ export class TaskRunner {
         ? {}
         : { adapterErrorSummary: outcome.result.errorSummary }),
       ...(validation === undefined ? {} : { validation }),
+      changedFiles: outcome.result.changedFiles,
       taskAmbiguity: request.features.task.ambiguity,
       repositoryBrokenBeforeRun: this.#repositoryBroken,
     });
@@ -384,6 +434,28 @@ export class TaskRunner {
     if (plan.checks.length === 0) return undefined;
 
     return this.#validation.run(plan, request.workspaceRoot);
+  }
+
+  /**
+   * Cheap damage check after a failed attempt.
+   *
+   * Deliberately syntax-only. The question here is narrow — did the model leave
+   * the workspace broken, or did something outside it fail — and running a test
+   * suite to answer it would spend minutes and money on a run that has already
+   * failed. Syntax is the check that most cheaply separates the two.
+   */
+  async #validateAfterFailure(request: RunRequest): Promise<ValidationReport | undefined> {
+    if (this.#validation === undefined) return undefined;
+
+    return this.#validation.run(
+      {
+        checks: ['syntax'],
+        rationale:
+          'the attempt failed after changing files, so syntax is checked to tell ' +
+          'model damage from an environment or provider failure',
+      },
+      request.workspaceRoot,
+    );
   }
 
   /**
@@ -465,9 +537,14 @@ export class TaskRunner {
   }
 
   /** The router selected nothing. */
-  #finishWithoutRunning(request: RunRequest, decision: RoutingDecision): RunResult {
+  #finishWithoutRunning(
+    request: RunRequest,
+    decision: RoutingDecision,
+    override?: { outcome: RunOutcome; reason: string },
+  ): RunResult {
     const outcome: RunOutcome =
-      decision.outcome === 'ask-user' ? 'needs-clarification' : 'no-model';
+      override?.outcome ?? (decision.outcome === 'ask-user' ? 'needs-clarification' : 'no-model');
+    const reason = override?.reason ?? decision.reason;
 
     return {
       requestId: request.requestId,
@@ -480,8 +557,8 @@ export class TaskRunner {
       totalCost: 0,
       // Nothing ran, so nothing was evaluated. `null`, not a zero score.
       score: null,
-      question: outcome === 'needs-clarification' ? decision.reason : null,
-      reason: decision.reason,
+      question: outcome === 'needs-clarification' ? reason : null,
+      reason,
     };
   }
 
@@ -528,18 +605,21 @@ export class TaskRunner {
     end: { outcome: RunOutcome; validation?: ValidationReport | undefined },
   ): TaskOutcome {
     const checks = checkResults(end.validation);
-    const succeeded = end.outcome === 'succeeded';
 
     return emptyOutcome(request.requestId, {
       taskType: request.features.task.taskType,
       scope: request.features.task.scope,
+      primaryLanguage: request.features.repository.primaryLanguage,
       // Only what was actually checked. Everything else stays `null`, which
       // means "not evaluated" and contributes nothing to the score.
       syntaxValid: checks.syntax,
       lintPassed: checks.lint,
       buildPassed: checks.build,
       testsPassed: checks.tests,
-      taskCriteriaMet: succeeded ? true : end.outcome === 'failed' ? false : null,
+      // `null` for an unverified run: nobody established the criteria were met,
+      // and recording `true` here would feed the same unfounded claim into
+      // scoring, learning and calibration.
+      taskCriteriaMet: end.outcome === 'succeeded' ? true : end.outcome === 'failed' ? false : null,
       userCancelled: end.outcome === 'cancelled',
       escalationCount: attempts.filter((attempt) => attempt.viaEscalation).length,
       modelsUsed: [...new Set(attempts.map((attempt) => attempt.modelId))],
@@ -629,6 +709,13 @@ function checkResults(validation: ValidationReport | undefined): {
 }
 
 /** Narrow a run attempt to what the escalation engine consumes. */
+/** Why a completed run could not be verified, in one clause. */
+function describeUnverified(validation: ValidationReport | undefined): string {
+  if (validation === undefined) return 'no validation was warranted for this task';
+  if (validation.plan.checks.length === 0) return 'the plan contained no checks';
+  return `no command is configured for ${validation.skipped.join(', ')}`;
+}
+
 function toExecutionAttempt(attempt: RunAttempt): ExecutionAttempt {
   return {
     modelId: attempt.modelId,

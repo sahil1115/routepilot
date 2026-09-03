@@ -126,8 +126,25 @@ export interface ValidationCheckResult {
 export interface ValidationReport {
   readonly plan: ValidationPlan;
   readonly results: readonly ValidationCheckResult[];
-  /** True when every check that ran passed. Checks that could not run do not count. */
+  /**
+   * True when every check that ran passed. Checks that could not run do not
+   * count — so this is `true` for a report where **nothing ran at all**.
+   *
+   * Read it together with {@link ValidationReport.evaluated}. On its own it
+   * answers "did anything fail", which is not the same question as "did
+   * anything pass", and treating it as the second is how an unvalidated run
+   * came to be reported as a success.
+   */
   readonly passed: boolean;
+  /**
+   * Whether any check actually produced a verdict.
+   *
+   * False when the plan was empty, or when every check was skipped because no
+   * command was configured or the tool could not be started. A caller deciding
+   * whether a task succeeded must require this; `passed` alone cannot
+   * distinguish "everything passed" from "nothing was checked".
+   */
+  readonly evaluated: boolean;
   /** Checks that could not be run at all. */
   readonly skipped: readonly ValidationCheck[];
 }
@@ -140,6 +157,16 @@ export interface ClassificationEvidence {
   readonly adapterErrorSummary?: string | undefined;
   /** Validation run after execution, when any was run. */
   readonly validation?: ValidationReport | undefined;
+  /**
+   * Files the agent reported changing.
+   *
+   * Self-reported by the agent's event stream, not observed on disk, so it is
+   * evidence about intent rather than proof of damage. It is still the
+   * difference between "the model edited eleven files and left the build
+   * broken" and "the provider returned 503 before anything happened" — and
+   * without it a failed run is classified from a single adapter string.
+   */
+  readonly changedFiles?: readonly string[] | undefined;
   /** How ambiguous the task was, in [0, 1] (from the classifier). */
   readonly taskAmbiguity?: number | undefined;
   /**

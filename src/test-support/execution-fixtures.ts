@@ -40,6 +40,7 @@ function failedCheck(
     plan: { checks: [check], rationale: 'fixture' },
     results: [{ check, passed: false, summary, output, exitCode: 1, durationMs: 100 }],
     passed: false,
+    evaluated: true,
     skipped: [],
   };
 }
@@ -53,6 +54,7 @@ function passingChecks(): ValidationReport {
       { check: 'tests', passed: true, summary: 'tests passed', exitCode: 0, durationMs: 400 },
     ],
     passed: true,
+    evaluated: true,
     skipped: [],
   };
 }

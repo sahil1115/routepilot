@@ -479,9 +479,9 @@ export class SqliteTelemetryStore
     try {
       const rows = this.#db
         .prepare(
-          `SELECT model_id, task_type, scope, observations, success_mass, updated_at
+          `SELECT model_id, task_type, scope, language, observations, success_mass, updated_at
              FROM learned_success
-            ORDER BY model_id, task_type, scope`,
+            ORDER BY model_id, task_type, scope, language`,
         )
         .all() as Record<string, unknown>[];
 
@@ -489,6 +489,7 @@ export class SqliteTelemetryStore
         modelId: String(row['model_id']),
         taskType: String(row['task_type']) as TaskType,
         scope: String(row['scope']) as TaskScope,
+        language: typeof row['language'] === 'string' ? row['language'] : 'unknown',
         observations: Number(row['observations']),
         successMass: Number(row['success_mass']),
         updatedAt: Number(row['updated_at']),
@@ -512,9 +513,9 @@ export class SqliteTelemetryStore
     this.#write('learned statistics', () => {
       const statement = this.#db.prepare(
         `INSERT INTO learned_success
-           (model_id, task_type, scope, observations, success_mass, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT (model_id, task_type, scope) DO UPDATE SET
+           (model_id, task_type, scope, language, observations, success_mass, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (model_id, task_type, scope, language) DO UPDATE SET
            observations = excluded.observations,
            success_mass = excluded.success_mass,
            updated_at   = excluded.updated_at`,
@@ -525,6 +526,7 @@ export class SqliteTelemetryStore
           entry.modelId,
           entry.taskType,
           entry.scope,
+          entry.language,
           entry.observations,
           entry.successMass,
           entry.updatedAt,

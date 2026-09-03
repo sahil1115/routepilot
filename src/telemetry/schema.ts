@@ -250,6 +250,40 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_shadow_policy ON shadow_decisions (policy_id, at)`,
     ],
   },
+  {
+    version: 6,
+    description: 'language in the learned-success key (Phase 25)',
+    statements: [
+      // The static predictor already scores a model differently per language
+      // via `ModelSpec.priors.languages`, so a model strong in TypeScript and
+      // weak in Rust is separated before any evidence exists. The learned
+      // posterior did not separate them: it pooled both into one bucket and
+      // shrank the language-aware prior toward a language-blind rate, so
+      // learning washed out the one dimension static routing had right.
+      //
+      // SQLite cannot add a column to a primary key, so the table is rebuilt.
+      // Existing rows keep their evidence under 'unknown', which is where a
+      // language-blind observation honestly belongs; attributing it to a
+      // language nobody recorded would be inventing data.
+      `ALTER TABLE learned_success RENAME TO learned_success_v5`,
+      `CREATE TABLE learned_success (
+        model_id TEXT NOT NULL,
+        task_type TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        language TEXT NOT NULL,
+        observations INTEGER NOT NULL,
+        success_mass REAL NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (model_id, task_type, scope, language)
+      )`,
+      `INSERT INTO learned_success
+         (model_id, task_type, scope, language, observations, success_mass, updated_at)
+       SELECT model_id, task_type, scope, 'unknown', observations, success_mass, updated_at
+       FROM learned_success_v5`,
+      `DROP TABLE learned_success_v5`,
+      `CREATE INDEX IF NOT EXISTS idx_learned_model ON learned_success (model_id)`,
+    ],
+  },
 ];
 
 /** The schema version this build expects. */

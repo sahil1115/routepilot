@@ -52,6 +52,14 @@ export interface BuildAdaptersOptions {
    * can report it alongside the ids that do exist.
    */
   readonly only?: string | undefined;
+  /**
+   * Per-adapter settings, keyed by adapter id.
+   *
+   * Until Phase 25 every adapter was constructed with no arguments at all, so
+   * `permissionMode` -- declared, plumbed and documented -- was never set, and
+   * `--permission-mode` never reached the CLI.
+   */
+  readonly agents?: Readonly<Partial<Record<string, AgentOptions>>> | undefined;
 }
 
 /**
@@ -65,10 +73,18 @@ export interface BuildAdaptersOptions {
  * The order is the fallback order — it is preserved into the registry, and the
  * registry tries adapters in registration order.
  */
-const BUILDABLE: readonly (() => AgentAdapter)[] = [
-  () => new ClaudeCodeAdapter(),
-  () => new CursorCliAdapter(),
+const BUILDABLE: readonly ((options: AgentOptions) => AgentAdapter)[] = [
+  (options) => new ClaudeCodeAdapter(options),
+  (options) => new CursorCliAdapter(options),
 ];
+
+/** Settings a caller may hand an adapter. Every field is optional. */
+export interface AgentOptions {
+  readonly permissionMode?: string | undefined;
+  readonly timeoutMs?: number | undefined;
+  readonly commandArgs?: readonly string[] | undefined;
+  readonly command?: string | undefined;
+}
 
 /**
  * Probe every buildable adapter and register the usable ones.
@@ -78,9 +94,13 @@ const BUILDABLE: readonly (() => AgentAdapter)[] = [
  * the slowest one.
  */
 export async function buildAdapters(options: BuildAdaptersOptions = {}): Promise<BuiltAdapters> {
-  const candidates = BUILDABLE.map((make) => make()).filter(
-    (adapter) => options.only === undefined || adapter.id === options.only,
-  );
+  // Built twice: once with no options to learn each adapter's id, then again
+  // with that adapter's settings. Cheap, and it keeps the id the single source
+  // of truth rather than duplicating it in a lookup table.
+  const candidates = BUILDABLE.map((make) => {
+    const id = make({}).id;
+    return make(options.agents?.[id] ?? {});
+  }).filter((adapter) => options.only === undefined || adapter.id === options.only);
 
   const probes = await Promise.all(
     candidates.map(async (adapter): Promise<AdapterProbe> => {
@@ -111,5 +131,5 @@ export async function buildAdapters(options: BuildAdaptersOptions = {}): Promise
 
 /** Ids of every adapter this module knows how to build. */
 export function buildableAdapterIds(): readonly string[] {
-  return BUILDABLE.map((make) => make().id);
+  return BUILDABLE.map((make) => make({}).id);
 }

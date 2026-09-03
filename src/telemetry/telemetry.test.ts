@@ -829,6 +829,7 @@ describe('learned statistics persistence', () => {
     modelId: 'acme/one',
     taskType: 'feature-implementation',
     scope: 'few-files',
+    language: 'unknown',
     observations: 30,
     successMass: 21,
     updatedAt: 1_700_000_000_000,
@@ -855,6 +856,7 @@ describe('learned statistics persistence', () => {
       modelId: 'acme/one',
       taskType: 'feature-implementation',
       scope: 'few-files',
+      language: 'unknown',
     });
     first.close();
 
@@ -867,6 +869,7 @@ describe('learned statistics persistence', () => {
       modelId: 'acme/one',
       taskType: 'feature-implementation',
       scope: 'few-files',
+      language: 'unknown',
     });
     second.close();
 

@@ -39,6 +39,7 @@ import type {
   ExecutionAttempt,
 } from '../types/escalation.js';
 import { ContextHandoffBuilder, handoffIsUseful } from './handoff.js';
+import { chooseVerticalTarget } from './target-selection.js';
 
 /** Everything the engine may look at. */
 export interface EscalationContext {
@@ -370,25 +371,20 @@ export class EscalationEngine {
   #findVertical(context: EscalationContext): ModelSpec | null {
     const current = this.#predictor.estimate(context.currentModel, context.features).probability;
 
-    const better = this.#candidates(context)
-      .map((model) => ({
+    // The same rule the cost estimator uses to *predict* this move. Two
+    // implementations disagreed until Phase 25 -- most sharply on ranking,
+    // where this one took the lowest sticker price and the estimator took the
+    // lowest expected cost -- so RoutePilot named one target and ran another.
+    return chooseVerticalTarget(
+      this.#candidates(context).map((model) => ({
         model,
-        probability: this.#predictor.estimate(model, context.features).probability,
-      }))
-      .filter((entry) => entry.probability > current + 0.02);
-
-    if (better.length === 0) return null;
-
-    // Among genuinely better models, take the cheapest. Escalation should not
-    // reach for the most expensive option available.
-    better.sort(
-      (a, b) =>
-        a.model.pricing.outputPerMillion - b.model.pricing.outputPerMillion ||
-        b.probability - a.probability ||
-        a.model.id.localeCompare(b.model.id),
+        successProbability: this.#predictor.estimate(model, context.features).probability,
+      })),
+      current,
+      // `#candidates` has already removed attempted models; passing them again
+      // costs nothing and keeps the rule's guarantee independent of its caller.
+      { exclude: context.attempts.map((attempt) => attempt.modelId) },
     );
-
-    return better[0]?.model ?? null;
   }
 
   /**

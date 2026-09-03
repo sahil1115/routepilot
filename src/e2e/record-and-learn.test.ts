@@ -182,7 +182,9 @@ describe('after completion, the run is recorded', () => {
       execute: true,
     });
 
-    expect(result.run?.outcome).toBe('succeeded');
+    // `unverified`, not `succeeded`: the CLI path configures no validation
+    // commands, so nothing confirmed the work (Phase 25).
+    expect(result.run?.outcome).toBe('unverified');
   });
 
   it('does not fail the run when recording throws', async () => {
@@ -207,7 +209,7 @@ describe('after completion, the run is recorded', () => {
       onProblem: (message) => problems.push(message),
     });
 
-    expect(result.run?.outcome).toBe('succeeded');
+    expect(result.run?.outcome).toBe('unverified');
     expect(problems.join(' ')).toContain('could not be recorded');
   });
 });

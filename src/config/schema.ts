@@ -161,6 +161,32 @@ const routingSchema = z.strictObject({
   fallbackProviderId: identifier.optional(),
 });
 
+/**
+ * Per-adapter settings.
+ *
+ * `permissionMode` is the one that matters. The Claude Code adapter has always
+ * accepted it and nothing ever set it, so `--permission-mode` was never passed
+ * -- and in print mode Claude Code cannot prompt for tool permission, so a task
+ * that needs to edit a file may fail rather than ask.
+ *
+ * There is deliberately no default. RoutePilot does not weaken a user's
+ * permission settings on their behalf; it exposes the control and leaves the
+ * choice with them.
+ */
+const agentSchema = z.strictObject({
+  permissionMode: z.string().min(1).optional(),
+  timeoutMs: positiveInt.optional(),
+  /** Arguments placed before the adapter's own, for wrappers and shims. */
+  commandArgs: z.array(z.string().min(1)).optional(),
+  /** Explicit path to the CLI, when it is not on PATH. */
+  command: z.string().min(1).optional(),
+});
+
+const agentsSchema = z.strictObject({
+  'claude-code': agentSchema.prefault({}),
+  'cursor-cli': agentSchema.prefault({}),
+});
+
 const budgetsSchema = z.strictObject({
   currency: currencyCode.default('USD'),
   request: nonNegativeAmount.optional(),
@@ -218,6 +244,7 @@ export const routePilotConfigSchema = z.strictObject({
   models: z.array(modelSchema).default([]),
   routing: routingSchema.prefault({}),
   budgets: budgetsSchema.prefault({}),
+  agents: agentsSchema.prefault({}),
   learning: learningSchema.prefault({}),
   shadow: shadowSchema.prefault({}),
   telemetry: telemetrySchema.prefault({}),

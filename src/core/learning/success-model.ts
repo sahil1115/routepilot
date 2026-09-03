@@ -318,17 +318,20 @@ export class LearnedSuccessModel {
     let successMass = 0;
 
     for (const [key, bucket] of this.#buckets) {
-      const [modelId, taskType, scope] = splitKey(key);
+      const [modelId, taskType, scope, language] = splitKey(key);
       if (modelId !== context.modelId) continue;
 
       const sameTask = taskType === context.taskType;
       const sameScope = scope === context.scope;
+      const sameLanguage = language === context.language;
       const belongs =
         level === 'model'
           ? !sameTask
           : level === 'task'
             ? sameTask && !sameScope
-            : sameTask && sameScope;
+            : level === 'scope'
+              ? sameTask && sameScope && !sameLanguage
+              : sameTask && sameScope && sameLanguage;
 
       if (!belongs) continue;
       observations += bucket.observations;
@@ -363,8 +366,20 @@ export class LearnedSuccessModel {
   }
 }
 
-/** Backoff levels, coarsest first. */
-const LEVELS = ['model', 'task', 'scope'] as const;
+/**
+ * Backoff levels, coarsest first.
+ *
+ * `language` was inserted as the deepest level in Phase 25. The three above it
+ * keep their exact meanings; what changed is that the most specific bucket is
+ * now language-aware, and "same task, same scope, a different language" became
+ * a level of its own rather than disappearing.
+ *
+ * That last part is the whole reason this is a fourth level and not a redefined
+ * third: the levels must **partition** the model's observations. If a bucket
+ * belonged to no level its evidence would vanish, and if it belonged to two it
+ * would be counted twice -- the Phase 10 bug, in both directions.
+ */
+const LEVELS = ['model', 'task', 'scope', 'language'] as const;
 
 /** One level of the backoff chain. */
 type Level = (typeof LEVELS)[number];
@@ -377,17 +392,40 @@ type Level = (typeof LEVELS)[number];
  * so a key can always be split back into exactly its three parts.
  */
 function keyOf(context: LearningContext): string {
-  return `${context.modelId}\n${context.taskType}\n${context.scope}`;
+  return `${context.modelId}\n${context.taskType}\n${context.scope}\n${context.language}`;
 }
 
-function splitKey(key: string): [string, string, string] {
-  const [modelId = '', taskType = 'unknown', scope = 'single-file'] = key.split('\n');
-  return [modelId, taskType, scope];
+function splitKey(key: string): [string, string, string, string] {
+  const [
+    modelId = '',
+    taskType = 'unknown',
+    scope = 'single-file',
+    // Keys written before language joined the key have three parts. They read
+    // back as `unknown`, which is exactly where a language-blind observation
+    // belongs, rather than being silently attributed to one language.
+    language = UNKNOWN_LANGUAGE,
+  ] = key.split('\n');
+  return [modelId, taskType, scope, language];
 }
 
 function toContext(key: string): LearningContext {
-  const [modelId, taskType, scope] = splitKey(key);
-  return { modelId, taskType: taskType as TaskType, scope: scope as TaskScope };
+  const [modelId, taskType, scope, language] = splitKey(key);
+  return { modelId, taskType: taskType as TaskType, scope: scope as TaskScope, language };
+}
+
+/**
+ * The language of a repository nobody could identify.
+ *
+ * A real value rather than null, because it is a legitimate bucket: an
+ * observation from a repository with no dominant language is still evidence
+ * about the model, and dropping it would lose data to tidiness.
+ */
+export const UNKNOWN_LANGUAGE = 'unknown';
+
+/** Normalise a language for use as a key. */
+export function learningLanguage(language: string | null | undefined): string {
+  const trimmed = language?.trim().toLowerCase() ?? '';
+  return trimmed === '' ? UNKNOWN_LANGUAGE : trimmed;
 }
 
 function isUsable(stats: LearnedStats): boolean {
@@ -433,6 +471,7 @@ export function observationFromOutcome(
     modelId,
     taskType: outcome.taskType,
     scope: outcome.scope,
+    language: learningLanguage(outcome.primaryLanguage),
     success: score.score,
     evidence: score.evidence,
   };

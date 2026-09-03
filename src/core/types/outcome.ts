@@ -55,6 +55,14 @@ export interface TaskOutcome {
   readonly requestId: string;
   readonly taskType: TaskType;
   readonly scope: TaskScope;
+  /**
+   * Primary language of the repository, when one was identified.
+   *
+   * Carried so learning can key on it. `null` is a real answer -- a repository
+   * with no dominant language -- and becomes the `unknown` bucket rather than
+   * being guessed at.
+   */
+  readonly primaryLanguage?: string | null | undefined;
 
   /** Validation dimensions. `null` means the check was not run. */
   readonly syntaxValid: boolean | null;

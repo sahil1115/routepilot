@@ -23,11 +23,12 @@
  * responsible only for pricing tokens and resolving escalation targets.
  */
 
-import { priceModelTokens } from '../pricing.js';
+import { priceModelTokens, isComparableCurrency } from '../pricing.js';
 import { expectedCostToSuccess } from './expected-cost.js';
 import type { RoutingFeatures } from '../types/features.js';
 import type { ModelSpec } from '../types/model.js';
 import type { CostProjection } from '../types/routing.js';
+import { chooseVerticalTarget } from '../escalation/target-selection.js';
 
 /** One model's success estimate, as produced by the success predictor. */
 export interface CandidateInput {
@@ -59,6 +60,17 @@ export class CostEstimator {
     const results = new Map<string, CostedCandidate>();
     if (candidates.length === 0) return results;
 
+    // Every comparison below is a bare numeric one -- ranking by expected cost,
+    // testing against a budget, choosing an escalation target. All of that is
+    // meaningless across currencies, and `isComparableCurrency` existed to say
+    // so while no caller checked it.
+    //
+    // The config schema rejects a mixed-currency document, so a run driven by
+    // the CLI cannot reach this. A library consumer building `ModelSpec`s by
+    // hand can, and would otherwise get a silently nonsensical ranking rather
+    // than an error.
+    assertOneCurrency(candidates);
+
     const usage = {
       inputTokens: features.context.estimatedInputTokens,
       outputTokens: features.context.estimatedOutputTokens,
@@ -76,15 +88,27 @@ export class CostEstimator {
 
       const initial = priceModelTokens(candidate.model, usage).totalCost;
 
-      // Candidates already processed are strictly stronger; the escalation
-      // target is whichever of them is cheapest to reach success through.
-      const stronger = ordered
-        .slice(0, i)
-        .filter((other) => other.successProbability > candidate.successProbability);
+      // Candidates already processed are strictly stronger and already costed,
+      // so the shared rule can rank them on expected cost -- the same rule the
+      // escalation engine applies at runtime, so the target named here is the
+      // one that would actually run.
+      //
+      // Models already attempted for this task are excluded, because the engine
+      // refuses them. Without this the estimate could be justified by a move to
+      // a model that has already failed.
+      const target = chooseVerticalTarget(
+        ordered.slice(0, i).map((other) => ({
+          model: other.model,
+          successProbability: other.successProbability,
+          expectedTotalCost: results.get(other.model.id)?.cost.expectedTotalToSuccess ?? null,
+        })),
+        candidate.successProbability,
+        { exclude: features.history.attemptedModelIds },
+      );
 
-      const target = cheapestToSuccess(stronger, results);
+      const targetId = target?.id ?? null;
       const targetCost =
-        target === null ? null : (results.get(target)?.cost.expectedTotalToSuccess ?? null);
+        targetId === null ? null : (results.get(targetId)?.cost.expectedTotalToSuccess ?? null);
 
       const breakdown = expectedCostToSuccess({
         initial,
@@ -95,7 +119,7 @@ export class CostEstimator {
       results.set(candidate.model.id, {
         modelId: candidate.model.id,
         cost: { ...breakdown, currency: candidate.model.pricing.currency },
-        escalationTargetId: target,
+        escalationTargetId: targetId,
       });
     }
 
@@ -103,29 +127,33 @@ export class CostEstimator {
   }
 }
 
-/** The already-costed model with the lowest expected total cost to success. */
-function cheapestToSuccess(
-  stronger: readonly CandidateInput[],
-  costed: ReadonlyMap<string, CostedCandidate>,
-): string | null {
-  let best: { id: string; cost: number } | null = null;
-
-  for (const candidate of stronger) {
-    const entry = costed.get(candidate.model.id);
-    if (entry === undefined) continue;
-
-    const cost = entry.cost.expectedTotalToSuccess;
-    if (best === null || cost < best.cost || (cost === best.cost && candidate.model.id < best.id)) {
-      best = { id: candidate.model.id, cost };
-    }
-  }
-
-  return best?.id ?? null;
-}
-
 /** Estimated wall-clock seconds for one attempt on a model. */
 export function estimateLatencySeconds(model: ModelSpec, features: RoutingFeatures): number {
   const { firstTokenSeconds, outputTokensPerSecond } = model.latency;
   if (outputTokensPerSecond <= 0) return Number.POSITIVE_INFINITY;
   return firstTokenSeconds + features.context.estimatedOutputTokens / outputTokensPerSecond;
+}
+
+/**
+ * Refuse to rank models priced in different currencies.
+ *
+ * Throws rather than degrading: there is no sensible fallback. Converting would
+ * need a rate this project does not have and should not invent, and comparing
+ * the numbers anyway produces a confident, wrong answer -- the worst outcome
+ * available.
+ */
+function assertOneCurrency(candidates: readonly CandidateInput[]): void {
+  const first = candidates[0]?.model;
+  if (first === undefined) return;
+
+  for (const candidate of candidates) {
+    if (isComparableCurrency(first.pricing, candidate.model.pricing)) continue;
+
+    throw new RangeError(
+      `Cannot compare model costs across currencies: "${first.id}" is priced in ` +
+        `${first.pricing.currency} and "${candidate.model.id}" in ` +
+        `${candidate.model.pricing.currency}. Price every model in one currency, ` +
+        `or convert before routing -- RoutePilot has no exchange rate and will not guess one.`,
+    );
+  }
 }

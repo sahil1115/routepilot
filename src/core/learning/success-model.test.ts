@@ -27,6 +27,7 @@ const CONTEXT: LearningContext = {
   modelId: 'acme/one',
   taskType: 'feature-implementation',
   scope: 'few-files',
+  language: 'unknown',
 };
 
 const ON = { enabled: true, minimumTrainingSamples: 20 };
@@ -132,8 +133,14 @@ describe('sample counts are real counts', () => {
 
   it('counts each observation exactly once across the level partition', () => {
     // The levels are disjoint and cover everything. Were they nested instead,
-    // the same evidence would be applied three times and this sum would come
+    // the same evidence would be applied once per level and this sum would come
     // to more than the total.
+    //
+    // Four levels since Phase 25, when language joined the key. The three above
+    // it are unchanged; `scope` now means "same task, same scope, a *different*
+    // language", which is empty here because every observation shares one. That
+    // it is zero rather than absent is the point: the partition stays total, so
+    // no evidence is lost and none is double-counted.
     const model = new LearnedSuccessModel(new InMemoryLearningStore(), ON);
     model.observeAll(
       [
@@ -141,10 +148,12 @@ describe('sample counts are real counts', () => {
         ...syntheticObservations('acme/one', 14, {
           taskType: 'feature-implementation',
           scope: 'many-files',
+          language: 'unknown',
         }),
         ...syntheticObservations('acme/one', 6, {
           taskType: 'feature-implementation',
           scope: 'few-files',
+          language: 'unknown',
         }),
       ],
       1_000,
@@ -153,7 +162,7 @@ describe('sample counts are real counts', () => {
     const estimate = model.estimate(0.8, CONTEXT);
     const perLevel = estimate.levels.map((level) => level.observations);
 
-    expect(perLevel).toEqual([10, 14, 6]);
+    expect(perLevel).toEqual([10, 14, 0, 6]);
     expect(perLevel.reduce((a, b) => a + b, 0)).toBe(estimate.observations);
     expect(estimate.observations).toBe(30);
   });
@@ -170,12 +179,15 @@ describe('sample counts are real counts', () => {
 
   it('reports an unobserved level as null rate rather than a zero rate', () => {
     const estimate = trained(30, 20).estimate(0.8, CONTEXT);
-    const [modelLevel, taskLevel, scopeLevel] = estimate.levels;
+    const [modelLevel, taskLevel, scopeLevel, languageLevel] = estimate.levels;
 
     expect(modelLevel?.observations).toBe(0);
     expect(modelLevel?.observedRate).toBeNull();
     expect(taskLevel?.observedRate).toBeNull();
-    expect(scopeLevel?.observedRate).toBeCloseTo(20 / 30, 10);
+    // Same task and scope but a different language: also unobserved here.
+    expect(scopeLevel?.observedRate).toBeNull();
+    // The deepest level, where every observation in this fixture lands.
+    expect(languageLevel?.observedRate).toBeCloseTo(20 / 30, 10);
   });
 
   it('passes the prior straight through a level with no data', () => {
@@ -396,5 +408,60 @@ describe('observationFromOutcome', () => {
     expect(result?.success).toBe(score.score);
     expect(result?.success).toBeGreaterThan(0);
     expect(result?.success).toBeLessThan(1);
+  });
+});
+
+describe('language separates learned buckets (Phase 25)', () => {
+  // The static predictor already scores a model differently per language via
+  // `ModelSpec.priors.languages`. The learned posterior did not: it pooled
+  // every language into one bucket and shrank the language-aware prior toward
+  // a language-blind rate, so learning washed out the one dimension static
+  // routing had right.
+  const base = { modelId: 'acme/one', taskType: 'bug-fix', scope: 'single-file' } as const;
+
+  function trainedOnTwoLanguages(): LearnedSuccessModel {
+    const model = new LearnedSuccessModel(new InMemoryLearningStore(), ON);
+    model.observeAll(
+      [
+        // Strong in TypeScript, weak in Rust, same model and same task shape.
+        ...syntheticObservations('acme/one', 40, { ...base, language: 'typescript', rate: 0.9 }),
+        ...syntheticObservations('acme/one', 40, { ...base, language: 'rust', rate: 0.1 }),
+      ],
+      1_000,
+    );
+    return model;
+  }
+
+  it('estimates the two languages differently', () => {
+    const model = trainedOnTwoLanguages();
+
+    const typescript = model.estimate(0.5, { ...base, language: 'typescript' });
+    const rust = model.estimate(0.5, { ...base, language: 'rust' });
+
+    expect(typescript.probability).toBeGreaterThan(rust.probability);
+  });
+
+  it('keeps every observation in exactly one bucket', () => {
+    // The partition invariant, with the new dimension in play: 80 observations
+    // in, 80 counted once each, whichever language is asked about.
+    const model = trainedOnTwoLanguages();
+    const estimate = model.estimate(0.5, { ...base, language: 'typescript' });
+    const perLevel = estimate.levels.map((level) => level.observations);
+
+    expect(perLevel.reduce((a, b) => a + b, 0)).toBe(80);
+    expect(estimate.observations).toBe(80);
+  });
+
+  it('pools an unidentified language into its own bucket, not into another', () => {
+    // A repository with no dominant language is still evidence about the model.
+    // Dropping it would lose data; attributing it to a language nobody recorded
+    // would invent some.
+    const model = trainedOnTwoLanguages();
+    const unknown = model.estimate(0.5, { ...base, language: 'unknown' });
+
+    // Nothing observed at the deepest level, so it falls back up the chain
+    // rather than borrowing either language's rate.
+    expect(unknown.levels.at(-1)?.observations).toBe(0);
+    expect(unknown.observations).toBe(80);
   });
 });

@@ -37,6 +37,20 @@ export interface LearningContext {
   readonly modelId: string;
   readonly taskType: TaskType;
   readonly scope: TaskScope;
+  /**
+   * Primary language of the repository, or `'unknown'`.
+   *
+   * The static predictor already discriminates by language through
+   * `ModelSpec.priors.languages`, so a model that is strong in TypeScript and
+   * weak in Rust is scored differently before any evidence exists. Until Phase
+   * 25 the learned posterior pooled both into one bucket and shrank the
+   * language-aware prior toward a language-blind rate -- so learning actively
+   * washed out the one dimension static routing had right.
+   *
+   * Normalised, never a raw path. Repository identity is deliberately absent:
+   * it would make every bucket a sample of one.
+   */
+  readonly language: string;
 }
 
 /**
@@ -85,8 +99,13 @@ export interface LearnedStats extends LearningContext {
 
 /** One level of the backoff hierarchy, exposed so an estimate can be audited. */
 export interface LearnedLevel {
-  /** `model`, `model+task`, or `model+task+scope`. */
-  readonly level: 'model' | 'task' | 'scope';
+  /**
+   * `model`, `model+task`, `model+task+scope`, or `model+task+scope+language`.
+   *
+   * Coarsest first. The four are **disjoint**: each counts only what the
+   * deeper ones exclude, so every observation enters the chain exactly once.
+   */
+  readonly level: 'model' | 'task' | 'scope' | 'language';
   /** Real observations aggregated at this level. */
   readonly observations: number;
   /** Observed success rate at this level, or `null` with no observations. */

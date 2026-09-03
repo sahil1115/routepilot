@@ -443,6 +443,7 @@ describe('FailureClassifier', () => {
         plan: { checks: ['tests'], rationale: 'x' },
         results: [{ check: 'tests', passed: false, summary: 'tests failed', durationMs: 1 }],
         passed: false,
+        evaluated: true,
         skipped: [],
       },
     });
@@ -466,6 +467,7 @@ describe('FailureClassifier', () => {
           },
         ],
         passed: false,
+        evaluated: true,
         skipped: [],
       },
       repositoryBrokenBeforeRun: false,
@@ -569,7 +571,11 @@ describe('ValidationEngine — planning', () => {
   it('runs the full sweep for a large refactor', () => {
     const plan = engine.planFor('multi-file-refactoring', 'repository-wide', 20);
 
-    expect(plan.checks).toEqual(['syntax', 'build', 'tests', 'diagnostics']);
+    // `diagnostics` was removed from the plan in Phase 25: no command source can
+    // supply one, so planning it guaranteed a check that could never run and
+    // every full-sweep report carried a permanent skip. Diagnostics reach the
+    // system through `DiagnosticsPort`, not a shell command.
+    expect(plan.checks).toEqual(['syntax', 'build', 'tests']);
     expect(plan.rationale).toContain('full sweep');
   });
 

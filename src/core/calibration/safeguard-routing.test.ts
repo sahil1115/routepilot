@@ -109,6 +109,7 @@ describe('a distrusted predictor is withdrawn', () => {
         modelId: 'acme/flatters-1',
         taskType: 'feature-implementation',
         scope: 'few-files',
+        language: 'unknown',
       }).applied,
     ).toBe(false);
   });
@@ -158,6 +159,7 @@ describe('the verdict is explained, not just applied', () => {
       modelId: 'acme/flatters-1',
       taskType: 'feature-implementation',
       scope: 'few-files',
+      language: 'unknown',
     });
 
     expect(estimate.reason).toContain('poorly calibrated');
