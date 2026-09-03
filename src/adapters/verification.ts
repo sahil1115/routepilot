@@ -109,20 +109,38 @@ export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   },
   {
     adapterId: 'cursor-cli',
-    status: 'unavailable',
+    status: 'verified',
     mechanism:
       'Wraps the documented `cursor-agent` CLI: ' +
       '`cursor-agent --print --output-format stream-json --model <id>` (spec section 19). ' +
       'No undocumented traffic interception, no modification of the Cursor installation.',
     howToVerify:
-      'Install the Cursor CLI (`cursor-agent`), then run: ' +
+      'Install the Cursor CLI (`cursor-agent`), sign in with `cursor-agent login`, then run: ' +
       'npm run verify:adapters -- cursor-cli',
+    evidence: {
+      date: '2026-09-03',
+      toolVersion: '2026.09.02',
+      note:
+        'Ran a trivial task end to end against Cursor CLI 2026.09.02-c22c1a3 on Windows, ' +
+        'Node 22.18.0. Result: completed in 33167 ms with no failure type. Observed event ' +
+        'kinds in order: user-message, assistant-message, completed. Recorded from the ' +
+        'machine-written report at .routepilot/adapter-verification-cursor-cli.json.',
+    },
     limitations: [
-      '`cursor-agent` is not installed on this machine, so nothing about this adapter has ' +
-        'been confirmed against the real tool — not even availability detection.',
-      'The event schema is built from the shapes named in the specification. It has not ' +
-        'been confirmed against real output, so both snake_case and camelCase key styles ' +
-        'are accepted and unrecognised events are ignored.',
+      'CONFIRMED against the real tool: availability detection, version parsing, Windows ' +
+        'shim resolution, process spawning, the stream-json event schema, event ' +
+        'normalisation through to a terminal `completed`, and workspace-trust handling.',
+      'NOT CONFIRMED: usage reporting — the real run returned no usage at all, so cost ' +
+        'for a Cursor run is priced from estimates rather than measurement. Also ' +
+        'unconfirmed: cancellation, timeouts, failure classification from real errors, ' +
+        'and any task requiring tool use.',
+      'On Windows the installer provides only `cursor-agent.cmd` and `.ps1`, which ' +
+        '`execFile` cannot launch without a shell. The adapter resolves the `node.exe` and ' +
+        '`index.js` those wrap; see `windows-shim.ts`. Without that it cannot run on ' +
+        'Windows at all.',
+      'The adapter passes `--trust`, which trusts the workspace the caller named. It does ' +
+        'NOT pass `--force` or `--yolo`, which grant blanket command approval for the ' +
+        'whole run; a test asserts they never reach the argument list.',
       'The Cursor editor launcher (`cursor`) is a different program and cannot be used ' +
         'here; the adapter says so in its setup error.',
     ],

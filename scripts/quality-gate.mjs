@@ -316,8 +316,11 @@ const CHECKLIST = [
   },
   {
     item: 'Cursor adapter tested',
-    verdict: 'CANNOT VERIFY',
-    note: '`cursor-agent` is not installed on this machine, so nothing has been confirmed — not even availability',
+    // Was CANNOT VERIFY while the CLI was not installed. Verified 2026-09-03.
+    note:
+      'verified 2026-09-03 against Cursor CLI 2026.09.02: a real task completed in 33 s. ' +
+      'Usage reporting is still unconfirmed -- the real run returned none -- as are ' +
+      'cancellation, timeouts and tool-using tasks',
   },
   {
     item: 'VS Code extension tested',

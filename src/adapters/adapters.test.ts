@@ -12,7 +12,8 @@
  * expect; only a real run proves those are the shapes the tool emits.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -360,6 +361,34 @@ describe('Cursor CLI adapter', () => {
 
     expect(result.status).toBe('completed');
     expect(result.changedFiles).toEqual(['src/a.ts']);
+  });
+
+  it('trusts the workspace, and never grants blanket command approval', async () => {
+    // The CLI refuses an untrusted directory in non-interactive mode and offers
+    // three ways out, which are not equivalent:
+    //
+    //   --trust  Trust the current workspace without prompting
+    //   --force  Force allow commands unless explicitly denied
+    //   --yolo   Alias for --force
+    //
+    // Only the first is scoped to the directory the user named. The other two
+    // approve every command for the whole run. Reaching for one of those to
+    // make a verification pass would be the single worst change anyone could
+    // make to this adapter, so it is asserted rather than trusted to review.
+    const argsPath = join(tmpdir(), `routepilot-cursor-args-${String(process.pid)}.json`);
+    const cli = await stub({ stdout: cursorSuccessTranscript(), recordArgsTo: argsPath });
+    const adapter = new CursorCliAdapter({ command: cli.command, commandArgs: cli.commandArgs });
+
+    const session = await adapter.execute(request({ workspaceRoot: cli.dir }), model);
+    await session.result;
+
+    const argv = JSON.parse(await readFile(argsPath, 'utf8')) as string[];
+    await rm(argsPath, { force: true });
+
+    expect(argv).toContain('--trust');
+    expect(argv).not.toContain('--force');
+    expect(argv).not.toContain('--yolo');
+    expect(argv).not.toContain('-f');
   });
 
   it('returns an actionable setup error when cursor-agent is absent', async () => {
@@ -741,7 +770,7 @@ describe('verification honesty (spec section 2, rule 20)', () => {
     const unverified = ADAPTER_VERIFICATION.filter(
       (entry) => entry.adapterId !== 'fake' && entry.status !== 'verified',
     );
-    expect(unverified.map((entry) => entry.adapterId)).toEqual(['cursor-cli', 'direct-provider']);
+    expect(unverified.map((entry) => entry.adapterId)).toEqual(['direct-provider']);
   });
 
   it('names the tool version in the evidence of anything verified', () => {
@@ -787,7 +816,11 @@ describe('verification honesty (spec section 2, rule 20)', () => {
     expect(entry?.limitations.join(' ')).toContain('wrapper');
   });
 
-  it('records that cursor-agent is not installed here', () => {
-    expect(verificationFor('cursor-cli')?.status).toBe('unavailable');
+  it('records the Cursor CLI as verified, with the version it was run against', () => {
+    // Was `unavailable` while the tool was not installed. On 2026-09-03 it was
+    // installed, signed in, and ran a task to completion.
+    const entry = verificationFor('cursor-cli');
+    expect(entry?.status).toBe('verified');
+    expect(entry?.evidence?.toolVersion).toBe('2026.09.02');
   });
 });

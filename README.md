@@ -12,9 +12,9 @@ what it expects to cost.
 >
 > - The routing pipeline is complete and tested — 1215 tests across 49 files,
 >   and `npm run gate` maps every quality-gate item to the evidence for it.
-> - **The Claude Code adapter is verified**: a real task ran against Claude
->   Haiku 4.5 through Claude Code 2.1.72 on 2026-09-03 and completed. The Cursor
->   and direct HTTP adapters remain **unverified**.
+> - **The Claude Code and Cursor adapters are verified**: both ran a real task
+>   to completion on 2026-09-03, against Claude Code 2.1.72 and Cursor CLI
+>   2026.09.02. The direct HTTP adapter remains **unverified**.
 > - **`routepilot run` still plans by default.** `--execute` starts a real
 >   coding agent; only the trivial, tool-free path has been proven.
 > - **The VS Code extension is verified in real VS Code** (1.136.0, Node
@@ -170,8 +170,8 @@ Requires Node ≥ 20.11.
 | Shadow policies and a contextual bandit                                                     | working, **off by default**         |
 | Task runner joining the whole pipeline                                                      | working, driven by `routepilot run` |
 | VS Code extension                                                                           | **verified in real VS Code 1.136**  |
-| Agent adapters: Claude Code                                                                 | **verified against the real tool**  |
-| Agent adapters: Cursor, direct HTTP                                                         | implemented, **unverified**         |
+| Agent adapters: Claude Code, Cursor                                                         | **verified against the real tool**  |
+| Agent adapters: direct HTTP                                                                 | implemented, **unverified**         |
 
 ---
 
@@ -179,12 +179,13 @@ Requires Node ≥ 20.11.
 
 The ones that would matter most if you were considering using this:
 
-1. **One adapter has been executed against a real model, once.** Claude Code
-   2.1.72 ran a trivial task against Claude Haiku 4.5 on 2026-09-03 and returned
-   `completed`. That proves the transport, the event schema and usage
-   reporting. It does not prove cancellation, timeout handling, failure
-   classification, or any task that needs tool use — and `cursor-cli` and
-   `direct-provider` remain unverified. The table is in `routepilot status`.
+1. **Two adapters have each been executed against a real model, once.** Claude
+   Code 2.1.72 (Claude Haiku 4.5) and Cursor CLI 2026.09.02, both on 2026-09-03,
+   both returning `completed`. That proves transport, the event schema and
+   normalisation. It does not prove cancellation, timeout handling, failure
+   classification, or any task needing tool use. Cursor reported no usage at
+   all, so its costs are estimates rather than measurements. `direct-provider`
+   remains unverified. The table is in `routepilot status`.
 2. **`routepilot run --execute` has never been run against a real agent.** The
    command exists and the spine is wired; every end-to-end assertion behind it
    still uses a scripted executor.

@@ -148,6 +148,26 @@ export class CursorCliAdapter implements AgentAdapter {
         '--print',
         '--output-format',
         'stream-json',
+        // Trust the workspace the caller named, and nothing more.
+        //
+        // In non-interactive mode the CLI refuses to touch an untrusted
+        // directory and tells the user to run interactively or pass a flag.
+        // There are three, and they are not equivalent:
+        //
+        //   --trust  Trust the current workspace without prompting
+        //   --force  Force allow commands unless explicitly denied
+        //   --yolo   Alias for --force
+        //
+        // Only the first is scoped to the directory. `--force` and `--yolo`
+        // grant blanket command approval for the whole run, which is a
+        // different and much larger permission than the one being asked for.
+        // RoutePilot passes `--trust` and must never pass the other two: a
+        // guard test asserts they never reach the argument list.
+        //
+        // Trusting this directory is defensible because the user has already
+        // said so twice -- by naming the workspace, and by passing --execute,
+        // which is the deliberate act that starts an agent at all.
+        '--trust',
         '--model',
         model.modelId,
         request.prompt,
