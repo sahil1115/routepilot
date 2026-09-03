@@ -16,9 +16,12 @@
  * a throwaway directory. Nothing in your repository is touched.
  */
 
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const ADAPTERS = {
   'claude-code': {
@@ -46,7 +49,11 @@ if (!target) {
 if (id === 'claude-code' && process.env.CLAUDECODE) {
   console.error(
     'Refusing to run: this looks like a Claude Code session (CLAUDECODE is set).\n' +
-      'Claude Code cannot run nested inside itself. Run this from a plain terminal.',
+      'Claude Code cannot run nested inside itself.\n\n' +
+      'Open a plain terminal -- PowerShell or Command Prompt from the Start menu,\n' +
+      'NOT the terminal inside VS Code -- then:\n' +
+      `  cd ${repoRoot}\n` +
+      '  npm run verify:adapters -- claude-code',
   );
   process.exit(2);
 }
@@ -142,5 +149,37 @@ if (ok) {
   console.log('');
   console.log('Leave the adapter marked unverified and fix the normalisation first.');
 }
+
+// Written to disk as well as printed, so the outcome can be recorded without
+// anyone re-typing it. `.routepilot/` is gitignored: this is evidence, not
+// source.
+const reportDir = join(repoRoot, '.routepilot');
+await mkdir(reportDir, { recursive: true });
+const reportPath = join(reportDir, `adapter-verification-${id}.json`);
+await writeFile(
+  reportPath,
+  JSON.stringify(
+    {
+      adapterId: id,
+      passed: ok,
+      ranAt: new Date().toISOString(),
+      toolVersion: status.version ?? null,
+      available: status.available,
+      resultStatus: result.status,
+      failureType: result.failureType ?? null,
+      usage: result.usage ?? null,
+      eventKinds: kinds,
+      elapsedMs: elapsed,
+      errorSummary: result.errorSummary ?? null,
+      platform: `${process.platform} node ${process.versions.node}`,
+    },
+    null,
+    2,
+  ),
+);
+
+console.log('');
+console.log(`Report written to ${reportPath}`);
+console.log('Nothing else is needed: that file is enough to record the result.');
 
 process.exit(ok ? 0 : 1);
