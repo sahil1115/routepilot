@@ -120,7 +120,10 @@ for await (const event of session.events) {
 const result = await session.result;
 const elapsed = Date.now() - started;
 
-await rm(dir, { recursive: true, force: true });
+// Cleanup deliberately happens *after* the report is written. On Windows the
+// agent's process can still hold a handle to the workspace for a moment after
+// it exits, and an EBUSY from rmdir once destroyed the entire result of a real
+// verification run that had already succeeded.
 
 // --- 3. Report -------------------------------------------------------------
 console.log('');
@@ -181,5 +184,16 @@ await writeFile(
 console.log('');
 console.log(`Report written to ${reportPath}`);
 console.log('Nothing else is needed: that file is enough to record the result.');
+
+// Best-effort, and never fatal: removing a temporary directory is tidying up,
+// not part of the verification. `maxRetries` matches the convention used
+// everywhere else in this repository for exactly this Windows behaviour.
+try {
+  await rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+} catch (error) {
+  console.log('');
+  console.log(`Note: could not remove ${dir} (${String(error)}).`);
+  console.log('That is a cleanup problem, not a verification failure.');
+}
 
 process.exit(ok ? 0 : 1);
