@@ -31,10 +31,24 @@ export const EXIT_USAGE = 2;
  */
 export const EXIT_NO_MODEL = 3;
 
+/**
+ * The task ran, nothing contradicted it, and nothing confirmed it.
+ *
+ * Distinct from {@link EXIT_ERROR}, which means the tool broke, and from
+ * {@link EXIT_OK}, which would let `routepilot run --execute && deploy` proceed
+ * on work nobody checked. Non-zero so a chain stops; its own code so a script
+ * can tell "unverified" from "failed" and decide which it can live with.
+ *
+ * Most often this means the workspace declares no test, build or typecheck
+ * script for RoutePilot to run.
+ */
+export const EXIT_UNVERIFIED = 4;
+
 /** Human-readable description of each code, for `routepilot help`. */
 export const EXIT_CODE_DESCRIPTIONS: readonly (readonly [number, string])[] = [
   [EXIT_OK, 'success'],
   [EXIT_ERROR, 'error (invalid configuration, I/O failure)'],
   [EXIT_USAGE, 'usage error (unknown command or bad argument)'],
   [EXIT_NO_MODEL, 'no model could be selected (routing declined, nothing is broken)'],
+  [EXIT_UNVERIFIED, 'the task ran but nothing validated it'],
 ];

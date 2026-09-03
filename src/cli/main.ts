@@ -40,6 +40,7 @@ import {
   EXIT_ERROR,
   EXIT_NO_MODEL,
   EXIT_OK,
+  EXIT_UNVERIFIED,
   EXIT_USAGE,
 } from './exit-codes.js';
 import { count, renderTable } from './format.js';
@@ -53,7 +54,7 @@ import { stableHash } from '../telemetry/redaction.js';
 import { CALIBRATION_WINDOW, renderDecision, routeTask, SHADOW_WINDOW } from './route.js';
 import { buildStatus, CAPABILITIES, renderStatus } from './status.js';
 
-export { EXIT_ERROR, EXIT_NO_MODEL, EXIT_OK, EXIT_USAGE };
+export { EXIT_ERROR, EXIT_NO_MODEL, EXIT_OK, EXIT_UNVERIFIED, EXIT_USAGE };
 
 /** Output sinks, injected so tests can capture them. */
 export interface CliIO {
@@ -323,7 +324,12 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
  */
 function exitCodeForRun(result: RunCommandResult): number {
   if (result.run !== null) {
-    return result.run.outcome === 'succeeded' ? EXIT_OK : EXIT_ERROR;
+    if (result.run.outcome === 'succeeded') return EXIT_OK;
+    // The task ran and nothing checked it. Not a success, and not a fault
+    // either -- EXIT_ERROR would tell a script the tool broke, which it did
+    // not. Non-zero so an `&&` chain stops short of acting on unchecked work.
+    if (result.run.outcome === 'unverified') return EXIT_UNVERIFIED;
+    return EXIT_ERROR;
   }
 
   switch (result.refusal) {

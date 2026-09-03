@@ -20,6 +20,7 @@ import { cheapModel, featuresFor, mediumModel, policy } from '../test-support/ro
 import { NOT_ASSESSED } from '../core/calibration/gate.js';
 import type { RouteResult } from './route.js';
 import { nestedAdapterIds, renderRun, runTask } from './run.js';
+import { EXIT_CODE_DESCRIPTIONS, EXIT_ERROR, EXIT_OK, EXIT_UNVERIFIED } from './exit-codes.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -517,5 +518,35 @@ describe('an explicitly requested model over the request budget', () => {
     expect(result.refusal).toBe('plan-only');
     expect(adapter.attempts).toBe(0);
     expect(renderRun(result)).toContain('over budget');
+  });
+});
+
+describe('exit codes distinguish unverified from broken', () => {
+  it('gives an unverified run its own code, not the error code', async () => {
+    // EXIT_ERROR means the tool broke. A run that completed with nothing to
+    // check it did not break, and a script told otherwise would treat a
+    // missing test script as a RoutePilot fault.
+    const result = await runTask({
+      ...BASE,
+      route: routeResult(),
+      config: config(),
+      registry: fakeRegistry(),
+      execute: true,
+    });
+
+    expect(result.run?.outcome).toBe('unverified');
+    expect(EXIT_UNVERIFIED).not.toBe(EXIT_ERROR);
+    expect(EXIT_UNVERIFIED).not.toBe(EXIT_OK);
+  });
+
+  it('is non-zero, so a chained command does not act on unchecked work', () => {
+    // `routepilot run --execute && deploy` must not deploy on work nobody
+    // validated. That is the whole reason this is not EXIT_OK.
+    expect(EXIT_UNVERIFIED).toBeGreaterThan(0);
+  });
+
+  it('is documented, so the contract stays scriptable', () => {
+    const described = EXIT_CODE_DESCRIPTIONS.find(([code]) => code === EXIT_UNVERIFIED);
+    expect(described?.[1]).toMatch(/nothing validated it/i);
   });
 });
