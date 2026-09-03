@@ -220,6 +220,18 @@ row per policy per request. An unknown policy id is a validation error.
 
 ## Telemetry
 
+> **Storing telemetry needs Node 22.5 or newer.** RoutePilot itself requires
+> only Node 20.11: routing, analysis, escalation and the CLI all work there.
+> The local store is built on `node:sqlite`, which arrived in Node 22.5, so on
+> an older runtime telemetry degrades to a store that records nothing and says
+> so by name. Nothing crashes and no task fails — the system is required to work
+> with telemetry disabled (spec section 2, rule 17), and this is that path taken
+> automatically.
+>
+> The same applies to the VS Code extension: hosts before VS Code 1.96 ship
+> Node 20, so history is unavailable there for the same reason and with the same
+> message.
+
 ```jsonc
 "telemetry": {
   "enabled": true,

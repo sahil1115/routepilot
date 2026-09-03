@@ -16,7 +16,7 @@ import type { ShadowStore } from '../core/types/shadow.js';
 import type { LearningStore } from '../core/types/learning.js';
 import type { TelemetryStore } from '../core/types/telemetry.js';
 import { NullTelemetryStore } from './null-store.js';
-import { SqliteTelemetryStore } from './sqlite-store.js';
+import { SqliteTelemetryStore, SqliteUnavailableError, type SqliteLoader } from './sqlite-store.js';
 
 /** Options for {@link openTelemetryStore}. */
 export interface OpenTelemetryOptions {
@@ -27,6 +27,8 @@ export interface OpenTelemetryOptions {
   readonly workspaceRoot?: string | undefined;
   /** Called when telemetry degrades, so the user can be told. */
   readonly onProblem?: ((message: string) => void) | undefined;
+  /** How `node:sqlite` is loaded. Injected only by tests. */
+  readonly loadSqlite?: SqliteLoader | undefined;
 }
 
 /** The default location: a dot-directory in the user's home. */
@@ -52,11 +54,16 @@ export async function openTelemetryStore(options: OpenTelemetryOptions): Promise
       directory: options.storagePath ?? defaultStorageDirectory(),
       ...(options.workspaceRoot === undefined ? {} : { workspaceRoot: options.workspaceRoot }),
       ...(options.onProblem === undefined ? {} : { onProblem: options.onProblem }),
+      ...(options.loadSqlite === undefined ? {} : { loadSqlite: options.loadSqlite }),
     });
   } catch (error) {
+    // A runtime without `node:sqlite` already explains itself; anything else
+    // gets the generic wrapper. Either way the store is null and the task runs.
     options.onProblem?.(
-      `Telemetry could not be started, so nothing will be recorded. ` +
-        `Routing is unaffected. Cause: ${error instanceof Error ? error.message : String(error)}`,
+      error instanceof SqliteUnavailableError
+        ? error.message
+        : `Telemetry could not be started, so nothing will be recorded. ` +
+            `Routing is unaffected. Cause: ${error instanceof Error ? error.message : String(error)}`,
     );
     return new NullTelemetryStore();
   }

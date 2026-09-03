@@ -71,6 +71,32 @@ interface SqliteDatabase {
 }
 
 /** Options for {@link SqliteTelemetryStore}. */
+/** Loads the `node:sqlite` binding. Injected so the missing case is testable. */
+export type SqliteLoader = () => Promise<{ DatabaseSync: new (path: string) => unknown }>;
+
+/**
+ * The Node release that first shipped `node:sqlite`.
+ *
+ * Below this the module does not exist and the import throws
+ * `ERR_UNKNOWN_BUILTIN_MODULE`. RoutePilot still runs — telemetry is optional
+ * by design (spec section 2, rule 17) — but the reason has to be legible, and
+ * "No such built-in module: node:sqlite" is not.
+ */
+export const SQLITE_MINIMUM_NODE = '22.5.0';
+
+/** Raised when the runtime has no `node:sqlite`, with the version that does. */
+export class SqliteUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super(
+      `This build of Node has no "node:sqlite" module, so telemetry cannot be stored. ` +
+        `It requires Node ${SQLITE_MINIMUM_NODE} or newer; this is Node ${process.versions.node}. ` +
+        `Routing, analysis and escalation are unaffected and continue to work.`,
+    );
+    this.name = 'SqliteUnavailableError';
+    this.cause = cause;
+  }
+}
+
 export interface SqliteStoreOptions {
   /** Directory holding the database file. */
   readonly directory: string;
@@ -80,6 +106,14 @@ export interface SqliteStoreOptions {
   readonly workspaceRoot?: string | undefined;
   /** Called when something is quarantined or a write fails. */
   readonly onProblem?: ((message: string) => void) | undefined;
+  /**
+   * How the `node:sqlite` binding is obtained.
+   *
+   * Injected only by tests. Without it the absence of the module could not be
+   * exercised on a machine that has it, and the graceful degradation would be
+   * true by accident rather than by test.
+   */
+  readonly loadSqlite?: SqliteLoader | undefined;
 }
 
 /** What happened when the store opened. */
@@ -132,13 +166,28 @@ export class SqliteTelemetryStore
   static async open(options: SqliteStoreOptions): Promise<SqliteTelemetryStore> {
     // Loaded lazily so a disabled-telemetry build never touches the
     // experimental API, nor prints its warning.
-    const { DatabaseSync } = await import('node:sqlite');
+    //
+    // `node:sqlite` arrived in Node 22.5. RoutePilot declares Node >= 20.11
+    // because everything except telemetry works there, so this import failing
+    // is a supported state rather than a fault — it is translated into an
+    // error that names the requirement, and the caller degrades to a
+    // NullTelemetryStore.
+    let DatabaseSync: new (path: string) => unknown;
+    try {
+      ({ DatabaseSync } = await (options.loadSqlite ?? loadNodeSqlite)());
+    } catch (error) {
+      // Only the module genuinely being absent becomes a version message.
+      // Relabelling every load failure would tell someone whose disk is full
+      // to upgrade Node, which is worse than saying nothing.
+      if (isMissingModule(error)) throw new SqliteUnavailableError(error);
+      throw error;
+    }
 
     const path = join(options.directory, options.fileName ?? 'routepilot.sqlite');
     mkdirSync(dirname(path), { recursive: true });
 
     const openAt = (): { db: SqliteDatabase; previousVersion: number; applied: number } => {
-      const db = new DatabaseSync(path) as unknown as SqliteDatabase;
+      const db = new DatabaseSync(path) as SqliteDatabase;
       try {
         // SQLite opens lazily, so constructing the handle proves nothing.
         // Reading the schema is what actually touches the file header and
@@ -711,6 +760,26 @@ function readVersion(db: SqliteDatabase): number {
     return 0;
   }
 }
+
+/**
+ * The real binding.
+ *
+ * A named function rather than an inline import so the injected form and the
+ * production form have the same shape, and so the specifier appears exactly
+ * once in the file.
+ */
+/** Whether an import failure means the module does not exist on this runtime. */
+function isMissingModule(error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+  return (
+    code === 'ERR_UNKNOWN_BUILTIN_MODULE' ||
+    code === 'ERR_MODULE_NOT_FOUND' ||
+    code === 'MODULE_NOT_FOUND'
+  );
+}
+
+const loadNodeSqlite: SqliteLoader = () => import('node:sqlite');
 
 function toRoutingRecord(row: Record<string, unknown>): RoutingRecord {
   return {

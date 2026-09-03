@@ -140,6 +140,34 @@ different module system.
 
 ---
 
+## Packaging
+
+A `.vsix` is a self-contained archive. Whatever the extension imports at
+runtime has to be inside it, because an installed extension sits in a directory
+with no ancestor `node_modules` to borrow from.
+
+Two things follow, and both are enforced rather than remembered:
+
+1. `npm run build:extension` runs `npm install --omit=dev` inside `extension/`,
+   so the extension carries its own copy of every runtime dependency.
+2. `scripts/verify-package.mjs` resolves each declared dependency the way Node
+   will and asserts the resolution lands **inside** `extension/`. It runs as
+   part of `verify:extension`, `package:extension` and the quality gate.
+
+The second is the one that matters. Inside the repository a missing dependency
+still resolves, because Node walks up and finds the root `node_modules` — so a
+broken package works perfectly on the machine that built it. That is precisely
+how `zod` came to be declared in `extension/package.json` and never installed
+there: every check passed, and the first user to install the `.vsix` would have
+seen `Cannot find package 'zod'`.
+
+Checking by _location_ rather than by copying the files somewhere isolated is
+deliberate: a temporary directory can itself sit under an ancestor
+`node_modules` — this machine has one — and the check would then pass for the
+wrong reason.
+
+---
+
 ## Known limitations
 
 1. **Nobody has run it in VS Code.** See above.

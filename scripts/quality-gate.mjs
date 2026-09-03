@@ -138,6 +138,17 @@ const extension = extensionBuilt
     })
   : { ok: false, stdout: 'could not be built' };
 
+// Separate from the fake-host checks: those prove the extension behaves, this
+// proves it would still load once installed. A package that borrows a
+// dependency from the repository passes every behavioural check and fails on
+// the first machine that installs it.
+const selfContained = run(node, [join(root, 'scripts', 'verify-package.mjs')]);
+gate(
+  'extension package is self-contained',
+  selfContained,
+  selfContained.ok ? 'every runtime dependency resolves inside extension/' : 'see the output above',
+);
+
 gate(
   'extension (fake VS Code host)',
   { ok: extension.ok && /19\/19 checks passed/.test(extension.stdout) },

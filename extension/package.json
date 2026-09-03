@@ -2,7 +2,7 @@
   "name": "routepilot-vscode",
   "displayName": "RoutePilot",
   "description": "Choose the cheapest path to success. Shows which coding model should handle a task, what it will cost, and why.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "license": "MIT",
   "author": "Sahil",
