@@ -8,18 +8,25 @@ what it expects to cost.
 
 > ### Status: honest about what it is
 >
-> RoutePilot **routes**. It does not yet **run**.
+> RoutePilot **routes, and runs**. What it has not done is a task that edits
+> code.
 >
-> - The routing pipeline is complete and tested — 1215 tests across 49 files,
->   and `npm run gate` maps every quality-gate item to the evidence for it.
-> - **The Claude Code and Cursor adapters are verified**: both ran a real task
->   to completion on 2026-09-03, against Claude Code 2.1.72 and Cursor CLI
->   2026.09.02. The direct HTTP adapter remains **unverified**.
-> - **`routepilot run` still plans by default.** `--execute` starts a real
->   coding agent; only the trivial, tool-free path has been proven.
+> - The pipeline is complete and tested — 1348 tests across 63 files, and
+>   `npm run gate` maps every quality-gate item to the evidence for it.
+> - **Two adapters are verified against their real tools**: Claude Code 2.1.72
+>   and Cursor CLI 2026.09.02 each ran a real task to completion on 2026-09-03.
+>   The direct HTTP adapter remains **unverified**.
+> - **No task requiring tool use has ever run.** Both verification prompts
+>   forbid tools, so file creation, file modification, terminal use and test
+>   execution are unproven. This is the gap that matters most.
+> - **Claude Code is passed no `--permission-mode`**, and in print mode it
+>   cannot prompt — so a task that needs to edit a file may fail rather than
+>   ask. `agents` in the configuration exposes the setting; nobody has tried it.
+> - **A run reports `unverified` unless your workspace declares test, build or
+>   typecheck scripts.** RoutePilot will not call a task successful on the
+>   agent's word alone.
 > - **The VS Code extension is verified in real VS Code** (1.136.0, Node
->   24.18.1): 8/8 extension-host checks plus 19 against a fake host. It is the
->   one integration that has been proven end to end.
+>   24.18.1): 8/8 extension-host checks plus 19 against a fake host.
 >
 > Every one of those is stated wherever it matters, not only here. See
 > [Limitations](#limitations).
