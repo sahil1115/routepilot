@@ -20,6 +20,21 @@ export const PRODUCT_NAME = 'RoutePilot' as const;
 export const TAGLINE = 'Choose the cheapest path to success.' as const;
 
 /**
+ * Released version of this build.
+ *
+ * Kept in step with `package.json` by a test, rather than read from it at
+ * runtime: the published bundle does not ship its manifest, and a version that
+ * silently became "unknown" in the artefact people actually install would be
+ * worse than one that cannot drift.
+ *
+ * 0.1.0 rather than 1.0.0 deliberately. The routing pipeline is complete and
+ * tested, but no agent adapter has been verified against its real tool, so
+ * nothing here has run against a real model. A major version would claim a
+ * stability this has not earned.
+ */
+export const VERSION = '0.1.0' as const;
+
+/**
  * Implementation phase actually present in this build.
  *
  * A factual marker of what has been implemented and validated, not a roadmap
@@ -36,6 +51,7 @@ export const IMPLEMENTED_PHASE = 23 as const;
 export interface BuildInfo {
   readonly productId: typeof PRODUCT_ID;
   readonly productName: typeof PRODUCT_NAME;
+  readonly version: string;
   readonly implementedPhase: number;
 }
 
@@ -44,6 +60,7 @@ export function getBuildInfo(): BuildInfo {
   return {
     productId: PRODUCT_ID,
     productName: PRODUCT_NAME,
+    version: VERSION,
     implementedPhase: IMPLEMENTED_PHASE,
   };
 }

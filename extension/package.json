@@ -2,9 +2,10 @@
   "name": "routepilot-vscode",
   "displayName": "RoutePilot",
   "description": "Choose the cheapest path to success. Shows which coding model should handle a task, what it will cost, and why.",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "author": "Sahil",
   "type": "commonjs",
   "engines": {
     "vscode": "^1.90.0"
@@ -66,7 +67,7 @@
           ],
           "default": null,
           "minimum": 0,
-          "markdownDescription": "Spending limit for one request. **May only lower the configured budget, never raise it** \u00e2\u20ac\u201d a workspace settings file arrives with a repository and is not trusted to widen a limit."
+          "markdownDescription": "Spending limit for one request. **May only lower the configured budget, never raise it** â€” a workspace settings file arrives with a repository and is not trusted to widen a limit."
         },
         "routepilot.minimumSuccessProbability": {
           "type": [
@@ -84,7 +85,7 @@
             "null"
           ],
           "default": null,
-          "markdownDescription": "Allow deliberate experiments. **May only switch exploration off, never on** \u00e2\u20ac\u201d enabling it is a decision for the configuration file, not for a repository you cloned."
+          "markdownDescription": "Allow deliberate experiments. **May only switch exploration off, never on** â€” enabling it is a decision for the configuration file, not for a repository you cloned."
         },
         "routepilot.operationMode": {
           "type": "string",

@@ -149,6 +149,22 @@ describe('routepilot help', () => {
     expect(result.stdout).toContain('--execute');
   });
 
+  it('prints the version for a bare --version, not the usage text', async () => {
+    // `command` defaults to `help` when no positional is given, so the help
+    // branch used to swallow `--version` and print the entire usage block.
+    const result = await invoke('--version');
+
+    expect(result.stdout).toMatch(/^RoutePilot \d+\.\d+\.\d+ \(implemented phase \d+\)$/);
+    expect(result.stdout).not.toContain('Usage:');
+  });
+
+  it('prints the same version for the version subcommand', async () => {
+    const flag = await invoke('--version');
+    const subcommand = await invoke('version');
+
+    expect(subcommand.stdout).toBe(flag.stdout);
+  });
+
   it('rejects an unknown command with a usage exit code', async () => {
     const result = await invoke('teleport');
 

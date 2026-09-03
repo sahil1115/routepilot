@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { IMPLEMENTED_PHASE, PRODUCT_ID, PRODUCT_NAME, getBuildInfo } from './index.js';
+import { IMPLEMENTED_PHASE, PRODUCT_ID, PRODUCT_NAME, VERSION, getBuildInfo } from './index.js';
 
 describe('baseline build info', () => {
   it('exposes a stable product identity', () => {
@@ -45,5 +45,48 @@ describe('the implemented-phase marker stays honest', () => {
 
     expect(complete.length).toBeGreaterThan(0);
     expect(IMPLEMENTED_PHASE).toBe(Math.max(...complete));
+  });
+});
+
+describe('the version stays in step with the manifests', () => {
+  const read = async (...parts: string[]): Promise<{ version: string; license: string }> =>
+    JSON.parse(
+      await readFile(join(dirname(fileURLToPath(import.meta.url)), '..', ...parts), 'utf8'),
+    ) as { version: string; license: string };
+
+  it('matches package.json', async () => {
+    // VERSION is a literal rather than a read of the manifest, because the
+    // published bundle does not ship one. That buys a value which cannot become
+    // "unknown" at runtime, and costs exactly this test.
+    const manifest = await read('package.json');
+    expect(VERSION).toBe(manifest.version);
+  });
+
+  it('matches the VS Code extension manifest', async () => {
+    // The extension is packaged separately and has drifted from the root
+    // manifest before. A .vsix claiming a different version of the same
+    // software is a support problem nobody can reproduce.
+    const manifest = await read('extension', 'package.json');
+    expect(VERSION).toBe(manifest.version);
+  });
+
+  it('declares the same licence everywhere, and ships the file', async () => {
+    const root = await read('package.json');
+    const extension = await read('extension', 'package.json');
+
+    expect(root.license).toBe('MIT');
+    expect(extension.license).toBe(root.license);
+
+    // A manifest that says MIT with no LICENSE file beside it grants nothing.
+    const licence = await readFile(
+      join(dirname(fileURLToPath(import.meta.url)), '..', 'LICENSE'),
+      'utf8',
+    );
+    expect(licence).toContain('MIT License');
+    expect(licence).toContain('Copyright (c)');
+  });
+
+  it('is reported by getBuildInfo', () => {
+    expect(getBuildInfo().version).toBe(VERSION);
   });
 });

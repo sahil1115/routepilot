@@ -1,9 +1,21 @@
 {
   "name": "routepilot",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "RoutePilot \u00e2\u20ac\u201d choose the cheapest path to success. An intelligent coding-agent model router.",
-  "license": "UNLICENSED",
+  "description": "RoutePilot â€” choose the cheapest path to success. An intelligent coding-agent model router.",
+  "author": "Sahil",
+  "contributors": [
+    "Sahil"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sahil1115/routepilot.git"
+  },
+  "homepage": "https://github.com/sahil1115/routepilot#readme",
+  "bugs": {
+    "url": "https://github.com/sahil1115/routepilot/issues"
+  },
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=20.11"

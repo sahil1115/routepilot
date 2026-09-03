@@ -215,3 +215,11 @@ npm run verify:adapters -- claude-code   # a real tool; plain terminal only
 - **Determinism is not negotiable.** No sampling, no clock in a decision.
 - **Every limitation gets written down.** A limitation that is recorded is a
   known constraint; one that is not is a future bug.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).
+
+Copyright (c) 2026 Sahil.

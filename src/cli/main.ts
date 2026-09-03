@@ -32,7 +32,7 @@ import {
 } from '../core/types/model.js';
 import type { ProviderSpec } from '../core/types/provider.js';
 import type { RoutingPolicy } from '../core/types/routing.js';
-import { IMPLEMENTED_PHASE, PRODUCT_NAME } from '../index.js';
+import { IMPLEMENTED_PHASE, PRODUCT_NAME, VERSION } from '../index.js';
 import { analyzeTask, chooseAnalysisLevel, renderAnalysis } from './analyze.js';
 import { ArgumentError, integerValue, listValue, parseArgs, singleValue } from './args.js';
 import {
@@ -101,7 +101,7 @@ Usage:
 Common options:
   --config <path>         Configuration file (else $ROUTEPILOT_CONFIG, else discovery)
   --json                  Emit JSON instead of tables
-  --version               Print the implemented phase
+  --version               Print the version and the implemented phase
 
 Options for "route" and "analyze":
   --root <path>           Workspace to analyse (default: current directory)
@@ -157,13 +157,16 @@ export async function run(argv: readonly string[], io: CliIO): Promise<number> {
 
   const command = args.positionals[0] ?? 'help';
 
-  if (command === 'help' || args.flags.has('help')) {
-    io.out(USAGE);
+  // Version is checked before help, because `command` defaults to `help` when
+  // no positional is given -- so a bare `--version` fell into the help branch
+  // and printed the whole usage text instead of a version.
+  if (command === 'version' || args.flags.has('version')) {
+    io.out(`${PRODUCT_NAME} ${VERSION} (implemented phase ${String(IMPLEMENTED_PHASE)})`);
     return EXIT_OK;
   }
 
-  if (command === 'version' || args.flags.has('version')) {
-    io.out(`${PRODUCT_NAME} (implemented phase ${String(IMPLEMENTED_PHASE)})`);
+  if (command === 'help' || args.flags.has('help')) {
+    io.out(USAGE);
     return EXIT_OK;
   }
 
