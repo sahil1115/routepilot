@@ -23,6 +23,11 @@ export interface RoutingConfig {
   /** Hard cap on retries against one model. */
   readonly maxRetriesPerModel: number;
   /**
+   * Hard cap on wall-clock time across every attempt of one task, in
+   * milliseconds (spec section 27). Absent means unlimited.
+   */
+  readonly maxExecutionTimeMs?: number | undefined;
+  /**
    * Whether the router may override a model the user selected explicitly.
    *
    * Defaults to false. An explicit choice is a decision, not a hint

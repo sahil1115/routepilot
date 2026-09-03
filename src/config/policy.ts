@@ -11,6 +11,7 @@ import type { ExplorationPolicy } from '../core/bandit/exploration-gate.js';
 import type { CalibrationThresholds } from '../core/types/calibration.js';
 import type { LearningPolicy } from '../core/learning/success-model.js';
 import type { RoutingPolicy } from '../core/types/routing.js';
+import type { EscalationLimits } from '../core/types/escalation.js';
 import type { RoutePilotConfig } from './types.js';
 
 /** Build the routing policy a configuration implies. */
@@ -26,6 +27,30 @@ export function toRoutingPolicy(config: RoutePilotConfig): RoutingPolicy {
     currency: budgets.currency,
     onBudgetExceeded: budgets.onExceeded,
     modelOverrideEnabled: routing.modelOverrideEnabled,
+  };
+}
+
+/**
+ * Build the escalation limits a configuration implies (spec section 27).
+ *
+ * Until Phase 24 nothing converted these, so `maxEscalationsPerTask` and
+ * `maxRetriesPerModel` were validated, documented and then ignored in favour of
+ * the runner's built-in defaults — which happened to equal the example
+ * configuration, so no test noticed. `budgets.request` is mapped to
+ * `maxTotalCost`: a request budget that bounded model selection but not the
+ * spend across retries and escalations was not a budget.
+ */
+export function toEscalationLimits(config: RoutePilotConfig): EscalationLimits {
+  const { routing, budgets } = config;
+
+  return {
+    maxEscalationsPerTask: routing.maxEscalationsPerTask,
+    maxRetriesPerModel: routing.maxRetriesPerModel,
+    // Absent means unlimited at this scope, never zero.
+    ...(budgets.request === undefined ? {} : { maxTotalCost: budgets.request }),
+    ...(routing.maxExecutionTimeMs === undefined
+      ? {}
+      : { maxExecutionTimeMs: routing.maxExecutionTimeMs }),
   };
 }
 

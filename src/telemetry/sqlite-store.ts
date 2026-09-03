@@ -401,6 +401,14 @@ export class SqliteTelemetryStore
     };
   }
 
+  recentRouting(limit: number): readonly RoutingRecord[] {
+    const rows = this.#db
+      .prepare(`SELECT * FROM routing_decisions ORDER BY decided_at DESC LIMIT ?`)
+      .all(limit) as Record<string, unknown>[];
+
+    return rows.map(toRoutingRecord);
+  }
+
   recentOutcomes(limit: number): readonly OutcomeRecord[] {
     const rows = this.#db
       .prepare(`SELECT * FROM outcomes ORDER BY recorded_at DESC LIMIT ?`)
@@ -702,6 +710,23 @@ function readVersion(db: SqliteDatabase): number {
   } catch {
     return 0;
   }
+}
+
+function toRoutingRecord(row: Record<string, unknown>): RoutingRecord {
+  return {
+    requestId: String(row['request_id']),
+    selectedModelId: typeof row['selected_model_id'] === 'string' ? row['selected_model_id'] : null,
+    outcome: String(row['outcome']),
+    staticTierPrior: row['static_tier_prior'] as RoutingRecord['staticTierPrior'],
+    minimumSuccessProbability: Number(row['minimum_success_probability']),
+    maxRisk: Number(row['max_risk']),
+    requestBudget: row['request_budget'] === null ? null : Number(row['request_budget']),
+    currency: String(row['currency']),
+    budgetExceeded: row['budget_exceeded'] === 1,
+    candidateCount: Number(row['candidate_count']),
+    excludedCount: Number(row['excluded_count']),
+    decidedAt: Number(row['decided_at']),
+  };
 }
 
 function toOutcomeRecord(row: Record<string, unknown>): OutcomeRecord {

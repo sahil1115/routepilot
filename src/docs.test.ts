@@ -127,3 +127,19 @@ describe('the documentation does not overclaim', () => {
     }
   });
 });
+
+describe('phase 24 behaviour is documented where it changed', () => {
+  it('ESCALATION.md states that escalation never lowers the bar', async () => {
+    const contents = await readFile(join(root, 'docs', 'ESCALATION.md'), 'utf8');
+    expect(contents).toMatch(/never lowers?\s+the bar/i);
+    expect(contents).toContain('maxTotalCost');
+  });
+
+  it('CONFIGURATION.md documents the execution-time limits and the override flag', async () => {
+    const contents = await readFile(join(root, 'docs', 'CONFIGURATION.md'), 'utf8');
+    expect(contents).toContain('maxExecutionTimeMs');
+    expect(contents).toContain('--allow-over-budget');
+    // A reader who configures `ask` must not expect an interactive prompt.
+    expect(contents).toMatch(/no interactive prompt/i);
+  });
+});

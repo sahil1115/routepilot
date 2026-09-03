@@ -7,7 +7,7 @@
  * one.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { AgentRegistry } from '../adapters/registry.js';
 import { FakeAgentAdapter } from '../adapters/fake/adapter.js';
@@ -20,6 +20,16 @@ import { cheapModel, featuresFor, mediumModel, policy } from '../test-support/ro
 import { NOT_ASSESSED } from '../core/calibration/gate.js';
 import type { RouteResult } from './route.js';
 import { nestedAdapterIds, renderRun, runTask } from './run.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { openTelemetryStore, type LocalStore } from '../telemetry/open.js';
+import { LearnedSuccessModel } from '../core/learning/success-model.js';
+import {
+  overratedModel,
+  syntheticObservations,
+  underratedModel,
+} from '../test-support/learning-fixtures.js';
 
 const MODELS = [cheapModel(), mediumModel()];
 
@@ -222,5 +232,283 @@ describe('the nested-session guard', () => {
     });
 
     expect(result.refusal).toBe('plan-only');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 24, defect 1: the model the plan names is the model that executes.
+// ---------------------------------------------------------------------------
+
+describe('the plan is the model that executes', () => {
+  // The Phase 10 fixture: static priors flatter `flatters-1`, and two hundred
+  // observations per model reveal `modest-1` as the better bet. A plan routed
+  // with learning names modest; a runner that re-routed without learning would
+  // execute flatters. That is exactly the divergence the review found.
+  const LEARNED = [overratedModel(), underratedModel()];
+  const TASK = 'implement a new /users API endpoint';
+  const learning = { enabled: true, minimumTrainingSamples: 50 };
+
+  const dirs: string[] = [];
+  const stores: LocalStore[] = [];
+
+  afterEach(async () => {
+    for (const store of stores.splice(0)) store.close();
+    await Promise.all(
+      dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 10 })),
+    );
+  });
+
+  function learnedConfig() {
+    return parseConfig({
+      version: 1,
+      providers: [
+        {
+          id: 'acme',
+          displayName: 'Acme',
+          kind: 'cloud',
+          auth: { kind: 'apiKey', envVar: 'ACME_API_KEY' },
+        },
+      ],
+      models: LEARNED.map((model) => ({ ...model, providerId: 'acme' })),
+      routing: { minimumSuccessProbability: 0.5 },
+      learning,
+    });
+  }
+
+  async function trainedStore(): Promise<LocalStore> {
+    const dir = await mkdtemp(join(tmpdir(), 'routepilot-plan-'));
+    dirs.push(dir);
+    const store = await openTelemetryStore({ enabled: true, storagePath: dir });
+    stores.push(store);
+
+    const trainer = new LearnedSuccessModel(store, learning);
+    trainer.observeAll(syntheticObservations('acme/flatters-1', 200), 1_000);
+    trainer.observeAll(syntheticObservations('acme/modest-1', 200), 1_000);
+    return store;
+  }
+
+  /** Route the way `routepilot route` does: with the learned model consulted. */
+  function planWith(store: LocalStore): RouteResult {
+    const registry = new ModelRegistry(LEARNED);
+    const decision = new RoutingEngine(registry, new LearnedSuccessModel(store, learning)).route({
+      features: featuresFor(TASK),
+      policy: policy({ minimumSuccessProbability: 0.5 }),
+    });
+    return {
+      analysis: {
+        classification: new TaskClassifier().classify({ prompt: TASK }),
+        snapshot: undefined as unknown as RouteResult['analysis']['snapshot'],
+        features: featuresFor(TASK),
+        timings: { analysisMs: 0, featureExtractionMs: 0 },
+      },
+      decision,
+      calibration: NOT_ASSESSED,
+      shadow: null,
+      timings: stageTimings({ analysisMs: 0, featureExtractionMs: 0, routingMs: 0 }),
+    };
+  }
+
+  it('executes the model the learned plan named, not the static favourite', async () => {
+    const store = await trainedStore();
+    const plan = planWith(store);
+
+    // Precondition: learning really did flip the choice. Without this the test
+    // would pass on any plan, including one that agreed with static routing.
+    expect(plan.decision.selectedModelId).toBe('acme/modest-1');
+    const unlearned = new RoutingEngine(new ModelRegistry(LEARNED)).route({
+      features: featuresFor(TASK),
+      policy: policy({ minimumSuccessProbability: 0.5 }),
+    });
+    expect(unlearned.selectedModelId).toBe('acme/flatters-1');
+
+    const adapter = new FakeAgentAdapter();
+    const registry = new AgentRegistry();
+    registry.register(adapter);
+
+    const result = await runTask({
+      route: plan,
+      config: learnedConfig(),
+      workspaceRoot: '/workspace',
+      task: TASK,
+      env: {},
+      registry,
+      execute: true,
+      store,
+    });
+
+    expect(result.refusal).toBeNull();
+    expect(adapter.executions[0]?.model.id).toBe(plan.decision.selectedModelId);
+    // Identity, not equality: the runner was handed this object and kept it.
+    expect(result.run?.decision).toBe(plan.decision);
+  });
+
+  it('records the decision the run executed', async () => {
+    const store = await trainedStore();
+    const plan = planWith(store);
+    const adapter = new FakeAgentAdapter();
+    const registry = new AgentRegistry();
+    registry.register(adapter);
+
+    await runTask({
+      route: plan,
+      config: learnedConfig(),
+      workspaceRoot: '/workspace',
+      task: TASK,
+      env: {},
+      registry,
+      execute: true,
+      store,
+    });
+
+    const recorded = store.recentRouting(1)[0];
+    expect(recorded?.selectedModelId).toBe(adapter.executions[0]?.model.id);
+    expect(recorded?.selectedModelId).toBe('acme/modest-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 24, defect 3: an explicit model over budget is never run silently.
+// ---------------------------------------------------------------------------
+
+describe('an explicitly requested model over the request budget', () => {
+  const BUDGET = 0.0001;
+  const REQUESTED = mediumModel().id;
+
+  function budgetConfig(onExceeded: 'stop' | 'ask' | 'allow-fallback') {
+    return parseConfig({
+      version: 1,
+      providers: [
+        {
+          id: 'acme',
+          displayName: 'Acme',
+          kind: 'cloud',
+          auth: { kind: 'apiKey', envVar: 'ACME_API_KEY' },
+        },
+      ],
+      models: MODELS.map((model) => ({ ...model, providerId: 'acme' })),
+      budgets: { request: BUDGET, onExceeded },
+    });
+  }
+
+  /** A plan that pins a model whose estimate is far over a tiny budget. */
+  function overBudgetPlan(): RouteResult {
+    const base = routeResult();
+    const decision = new RoutingEngine(new ModelRegistry(MODELS)).route({
+      features: featuresFor('Rename this variable.'),
+      policy: policy({ requestBudget: BUDGET }),
+      requestedModelId: REQUESTED,
+    });
+    // Precondition for every test below.
+    expect(decision.selectedModelId).toBe(REQUESTED);
+    expect(decision.budgetExceeded).toBe(true);
+    return { ...base, decision };
+  }
+
+  function harness() {
+    const adapter = new FakeAgentAdapter();
+    const registry = new AgentRegistry();
+    registry.register(adapter);
+    return { adapter, registry };
+  }
+
+  it('is refused when onExceeded is "stop", naming the model, estimate and budget', async () => {
+    const { adapter, registry } = harness();
+    const result = await runTask({
+      ...BASE,
+      route: overBudgetPlan(),
+      config: budgetConfig('stop'),
+      registry,
+      execute: true,
+    });
+
+    expect(result.refusal).toBe('budget-exceeded');
+    expect(adapter.attempts).toBe(0);
+
+    const rendered = renderRun(result);
+    expect(rendered).toContain('over budget');
+    expect(rendered).toContain(REQUESTED);
+    expect(rendered).toContain('cannot be overridden');
+  });
+
+  it('is refused when onExceeded is "ask", and names the override flag', async () => {
+    const { adapter, registry } = harness();
+    const result = await runTask({
+      ...BASE,
+      route: overBudgetPlan(),
+      config: budgetConfig('ask'),
+      registry,
+      execute: true,
+    });
+
+    expect(result.refusal).toBe('budget-exceeded');
+    expect(adapter.attempts).toBe(0);
+    expect(renderRun(result)).toContain('--allow-over-budget');
+  });
+
+  it('executes under "ask" once --allow-over-budget is given, and prints the overspend', async () => {
+    const { adapter, registry } = harness();
+    const result = await runTask({
+      ...BASE,
+      route: overBudgetPlan(),
+      config: budgetConfig('ask'),
+      registry,
+      execute: true,
+      allowOverBudget: true,
+    });
+
+    expect(result.refusal).toBeNull();
+    expect(adapter.attempts).toBe(1);
+    expect(result.overspend?.permittedBy).toBe('flag');
+
+    const rendered = renderRun(result);
+    expect(rendered).toContain('over budget');
+    expect(rendered).toContain('--allow-over-budget was passed');
+  });
+
+  it('executes under "allow-fallback" and prints the overspend', async () => {
+    const { adapter, registry } = harness();
+    const result = await runTask({
+      ...BASE,
+      route: overBudgetPlan(),
+      config: budgetConfig('allow-fallback'),
+      registry,
+      execute: true,
+    });
+
+    expect(result.refusal).toBeNull();
+    expect(adapter.attempts).toBe(1);
+    expect(result.overspend?.permittedBy).toBe('policy');
+    expect(renderRun(result)).toContain('over budget');
+  });
+
+  it('does not let the flag outrank a policy of "stop"', async () => {
+    // `stop` is the configuration saying no. A command-line flag is not the
+    // place to overrule an administrator's decision about money.
+    const { adapter, registry } = harness();
+    const result = await runTask({
+      ...BASE,
+      route: overBudgetPlan(),
+      config: budgetConfig('stop'),
+      registry,
+      execute: true,
+      allowOverBudget: true,
+    });
+
+    expect(result.refusal).toBe('budget-exceeded');
+    expect(adapter.attempts).toBe(0);
+  });
+
+  it('still produces a plan, with the marker, when not executing', async () => {
+    const { adapter, registry } = harness();
+    const result = await runTask({
+      ...BASE,
+      route: overBudgetPlan(),
+      config: budgetConfig('stop'),
+      registry,
+    });
+
+    expect(result.refusal).toBe('plan-only');
+    expect(adapter.attempts).toBe(0);
+    expect(renderRun(result)).toContain('over budget');
   });
 });

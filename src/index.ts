@@ -27,12 +27,12 @@ export const TAGLINE = 'Choose the cheapest path to success.' as const;
  * silently became "unknown" in the artefact people actually install would be
  * worse than one that cannot drift.
  *
- * 0.1.0 rather than 1.0.0 deliberately. The routing pipeline is complete and
+ * 0.x rather than 1.0.0 deliberately. The routing pipeline is complete and
  * tested, but no agent adapter has been verified against its real tool, so
  * nothing here has run against a real model. A major version would claim a
  * stability this has not earned.
  */
-export const VERSION = '0.1.0' as const;
+export const VERSION = '0.2.0' as const;
 
 /**
  * Implementation phase actually present in this build.
@@ -45,7 +45,7 @@ export const VERSION = '0.1.0' as const;
  * `index.test.ts` now checks it against the highest phase `docs/ROADMAP.md`
  * marks complete.
  */
-export const IMPLEMENTED_PHASE = 23 as const;
+export const IMPLEMENTED_PHASE = 24 as const;
 
 /** Describes what this build actually contains. */
 export interface BuildInfo {

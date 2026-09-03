@@ -23,7 +23,6 @@
  * this is the only place a real task reaches the database.
  */
 
-import type { RoutingDecision } from '../core/types/routing.js';
 import type { RunResult } from '../core/types/run.js';
 import type { RoutingFeatures } from '../core/types/features.js';
 import type {
@@ -46,7 +45,15 @@ export interface RecordRunInput {
   /** Hashed, never stored. */
   readonly workspaceRoot: string;
   readonly features: RoutingFeatures;
-  readonly decision: RoutingDecision;
+  /**
+   * The run, which carries the decision it actually executed.
+   *
+   * There is deliberately no separate `decision` input. Until Phase 24 the CLI
+   * recorded the decision it had *printed* while the runner routed again on
+   * its own, so with learning or exploration in play the record could name a
+   * model the run never used. The only decision worth recording is the one on
+   * the run.
+   */
   readonly run: RunResult;
   /** Injected so a recorded timestamp is testable. */
   readonly now?: number | undefined;
@@ -82,9 +89,7 @@ export function recordRun(input: RecordRunInput): void {
       toModelId: escalation.toModelId,
       failureType: escalation.failureType,
       reason: redactSummary(escalation.reason) ?? '',
-      // The runner does not surface which limit stopped it, only that it did.
-      // Null is the honest value; a guess would be worse than a blank.
-      limitReached: null,
+      limitReached: escalation.limitReached,
       at,
     });
   });
@@ -119,7 +124,7 @@ function requestRecord(input: RecordRunInput, at: number): RequestRecord {
 }
 
 function routingRecord(input: RecordRunInput, at: number): RoutingRecord {
-  const { decision } = input;
+  const { decision } = input.run;
   const { policy } = decision;
 
   return {
@@ -139,7 +144,7 @@ function routingRecord(input: RecordRunInput, at: number): RoutingRecord {
 }
 
 function candidateRecords(input: RecordRunInput): readonly CandidateRecord[] {
-  return input.decision.evaluations.map((evaluation) => ({
+  return input.run.decision.evaluations.map((evaluation) => ({
     requestId: input.requestId,
     modelId: evaluation.modelId,
     tier: evaluation.tier,
@@ -149,7 +154,7 @@ function candidateRecords(input: RecordRunInput): readonly CandidateRecord[] {
     risk: evaluation.risk,
     estimatedLatencySeconds: evaluation.estimatedLatencySeconds,
     viable: evaluation.viable,
-    selected: evaluation.modelId === input.decision.selectedModelId,
+    selected: evaluation.modelId === input.run.decision.selectedModelId,
     usedTierDefault: evaluation.usedTierDefault,
   }));
 }
@@ -211,7 +216,7 @@ function outcomeRecord(input: RecordRunInput, at: number): OutcomeRecord {
     escalationCount: run.escalations.length,
     modelsUsed: run.attempts.map((attempt) => attempt.modelId),
     totalCost: run.totalCost,
-    currency: input.decision.policy.currency,
+    currency: input.run.decision.policy.currency,
     totalLatencyMs: run.attempts.reduce((total, attempt) => total + attempt.durationMs, 0),
     failureType: run.attempts.at(-1)?.failureType ?? null,
     successScore: score?.score ?? null,

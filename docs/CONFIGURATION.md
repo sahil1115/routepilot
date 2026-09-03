@@ -118,12 +118,17 @@ cost to success.
   "maxLatencySeconds": 900,
   "maxEscalationsPerTask": 2,
   "maxRetriesPerModel": 1,
+  "maxExecutionTimeMs": 900000,       // optional: wall-clock cap across every attempt
   "modelOverrideEnabled": false       // may the router override an explicit --model?
 }
 ```
 
 `modelOverrideEnabled` defaults to **false**. An explicit choice is a decision,
 not a hint.
+
+`maxEscalationsPerTask`, `maxRetriesPerModel` and `maxExecutionTimeMs` are the
+limits `routepilot run --execute` applies during execution. Until Phase 24 the
+first two were validated and then ignored in favour of built-in defaults.
 
 ---
 
@@ -146,8 +151,24 @@ An absent limit means "not limited at this scope", never zero.
 > and displayed and **nothing applies them**. This is a real gap, not a
 > simplification — see [Limitations](#limitations).
 
-RoutePilot never silently exceeds a budget. When nothing fits, it asks, stops,
-or falls back — and says which.
+`request` bounds two things. At routing time, no model whose expected total
+cost to success exceeds it is selected. At execution time it becomes the cap on
+total spend across every attempt, retry and escalation of the run, and the next
+attempt is not started if it is projected to take the total past it.
+
+RoutePilot never silently exceeds a budget. The one way past it is an explicit
+`--model` whose estimate is over the request budget, and `onExceeded` decides
+what happens then:
+
+| `onExceeded`     | `routepilot run --execute --model X`                                  |
+| ---------------- | --------------------------------------------------------------------- |
+| `stop`           | refuses, exit code 3, naming the model, the estimate and the budget   |
+| `ask`            | refuses the same way, and names `--allow-over-budget` as the override |
+| `allow-fallback` | executes, and prints the overspend in the run's outcome               |
+
+There is no interactive prompt: the CLI is scripted, so `ask` means "refuse
+until told otherwise on the command line". A plan (without `--execute`) shows
+the over-budget marker and refuses nothing.
 
 ---
 

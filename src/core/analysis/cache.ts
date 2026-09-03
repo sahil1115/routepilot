@@ -34,18 +34,44 @@ export interface CacheStatistics {
 const DEFAULT_MAX_ENTRIES = 8;
 
 /** A bounded, in-memory cache of repository analyses, keyed by root path. */
+/** Options for {@link AnalysisCache}. */
+export interface AnalysisCacheOptions {
+  readonly maxEntries?: number | undefined;
+  /**
+   * Whether two roots differing only in letter case are different repositories.
+   *
+   * True on Linux, where `/srv/App` and `/srv/app` are distinct directories and
+   * folding them would let one repository's analysis be served for the other.
+   * False on Windows and macOS, whose default filesystems treat them as one.
+   *
+   * The core has no platform knowledge and does not acquire any here: the
+   * caller decides, and the default is the safe one — never conflate.
+   */
+  readonly caseSensitive?: boolean | undefined;
+}
+
 export class AnalysisCache {
   readonly #entries = new Map<string, CachedAnalysis>();
   readonly #maxEntries: number;
+  readonly #caseSensitive: boolean;
   #hits = 0;
   #misses = 0;
   #evictions = 0;
 
-  constructor(maxEntries: number = DEFAULT_MAX_ENTRIES) {
+  constructor(options: number | AnalysisCacheOptions = {}) {
+    // A bare number is the pre-Phase-24 signature and still means maxEntries.
+    const resolved = typeof options === 'number' ? { maxEntries: options } : options;
+    const maxEntries = resolved.maxEntries ?? DEFAULT_MAX_ENTRIES;
     if (!Number.isInteger(maxEntries) || maxEntries < 1) {
       throw new RangeError(`maxEntries must be a positive integer (received ${maxEntries})`);
     }
     this.#maxEntries = maxEntries;
+    this.#caseSensitive = resolved.caseSensitive ?? true;
+  }
+
+  /** Normalise a root into the key it is stored under. */
+  #key(root: string): string {
+    return normaliseRoot(root, this.#caseSensitive);
   }
 
   /** Number of repositories currently cached. */
@@ -65,7 +91,7 @@ export class AnalysisCache {
 
   /** Look up a cached analysis, refreshing its recency on a hit. */
   get(root: string): CachedAnalysis | undefined {
-    const key = normaliseRoot(root);
+    const key = this.#key(root);
     const entry = this.#entries.get(key);
 
     if (entry === undefined) {
@@ -82,7 +108,7 @@ export class AnalysisCache {
 
   /** Store an analysis, evicting the least recently used entry when full. */
   set(root: string, analysis: CachedAnalysis): void {
-    const key = normaliseRoot(root);
+    const key = this.#key(root);
     this.#entries.delete(key);
 
     if (this.#entries.size >= this.#maxEntries) {
@@ -98,7 +124,7 @@ export class AnalysisCache {
 
   /** Forget one repository. Returns false when it was not cached. */
   invalidate(root: string): boolean {
-    return this.#entries.delete(normaliseRoot(root));
+    return this.#entries.delete(this.#key(root));
   }
 
   /** Forget everything, including the statistics. */
@@ -111,6 +137,7 @@ export class AnalysisCache {
 }
 
 /** Normalise a root path so separator style does not split cache entries. */
-function normaliseRoot(root: string): string {
-  return root.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+function normaliseRoot(root: string, caseSensitive: boolean): string {
+  const separators = root.replace(/\\/g, '/').replace(/\/+$/, '');
+  return caseSensitive ? separators : separators.toLowerCase();
 }

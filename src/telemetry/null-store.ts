@@ -50,6 +50,10 @@ export class NullTelemetryStore
     };
   }
 
+  recentRouting(_limit: number): readonly RoutingRecord[] {
+    return [];
+  }
+
   recentOutcomes(_limit: number): readonly OutcomeRecord[] {
     return [];
   }

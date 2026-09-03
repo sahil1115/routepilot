@@ -203,6 +203,8 @@ export interface TelemetryStore {
   statistics(): TelemetryStatistics;
   /** Most recent outcomes, newest first. */
   recentOutcomes(limit: number): readonly OutcomeRecord[];
+  /** Most recent routing decisions, newest first. */
+  recentRouting(limit: number): readonly RoutingRecord[];
 
   close(): void;
 }

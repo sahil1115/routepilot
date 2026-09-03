@@ -20,7 +20,7 @@ import type { AgentEvent, AgentExecutionRequest, AgentResult } from './agent.js'
 import type { FailureType } from './failure.js';
 import type { RoutingFeatures } from './features.js';
 import type { ModelSpec } from './model.js';
-import type { ContextHandoff, EscalationAction } from './escalation.js';
+import type { ContextHandoff, EscalationAction, EscalationLimit } from './escalation.js';
 import type { RoutingDecision, RoutingPolicy } from './routing.js';
 import type { TaskOutcome, TaskSuccessScore } from './outcome.js';
 
@@ -95,6 +95,8 @@ export interface RunEscalation {
   readonly reason: string;
   /** Whether the failure may inform beliefs about the model. */
   readonly modelAttributable: boolean;
+  /** Which limit stopped the task, when `action` is `stop`. */
+  readonly limitReached: EscalationLimit | null;
 }
 
 /** How a run finished. */
@@ -123,6 +125,16 @@ export interface RunRequest {
   readonly branch?: string | null | undefined;
   /** Capabilities this request genuinely needs. */
   readonly requiredCapabilities?: AgentExecutionRequest['requiredCapabilities'] | undefined;
+  /**
+   * A decision already made, to be executed rather than re-derived.
+   *
+   * When present the runner routes nothing: the model this names is the model
+   * that runs. That is what lets a caller print a plan and then execute exactly
+   * it. With learning, calibration or exploration in play, routing twice can
+   * choose twice, and the record would then describe a decision the run never
+   * executed. Absent, the runner routes from `features` and `policy` itself.
+   */
+  readonly decision?: RoutingDecision | undefined;
 }
 
 /** Everything one run produced. */

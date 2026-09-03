@@ -25,34 +25,35 @@ Numbering follows the specification's phases, which is what has been
 implemented against. Earlier revisions of this table used a different numbering
 and had drifted out of step with the code; it was corrected in Phase 9.
 
-| Phase | Name                                 | Status                    |
-| ----- | ------------------------------------ | ------------------------- |
-| 0     | Baseline                             | **Complete**              |
-| 1     | Domain model + model registry        | **Complete**              |
-| 2     | Task + repository intelligence       | **Complete**              |
-| 3     | Constraint filter + static router    | **Complete**              |
-| 4     | CLI (cost model + budgets folded in) | **Complete**              |
-| 5     | Agent adapters                       | **Complete (unverified)** |
-| 6     | Execution monitor + failure taxonomy | **Complete**              |
-| 7     | Escalation graph + context handoff   | **Complete**              |
-| 8     | Outcome model + local telemetry      | **Complete**              |
-| 9     | Expected cost to success             | **Complete**              |
-| 10    | Learning (P(success) online)         | **Complete**              |
-| 11    | Calibration + safeguards             | **Complete**              |
-| 12    | Shadow policy                        | **Complete**              |
-| 13    | Contextual bandit + safe exploration | **Complete**              |
-| 14    | VS Code extension                    | **Complete (unverified)** |
-| 15    | End-to-end scenarios + task runner   | **Complete**              |
-| 16    | Performance                          | **Complete**              |
-| 17    | Documentation                        | **Complete**              |
-| 18    | Final quality gate                   | **Complete**              |
-| 19    | Development behaviour                | **Complete**              |
-| 20    | MVP scope audit                      | **Complete**              |
-| 21    | MVP milestone — `routepilot run`     | **Complete**              |
-| 22    | Closing the loop — record and learn  | **Complete**              |
-| 23    | Re-inspection and plan               | **Complete**              |
-| 24    | Validation configuration             | Next                      |
-| 25    | Offline policy evaluation            | Not started               |
+| Phase | Name                                    | Status                    |
+| ----- | --------------------------------------- | ------------------------- |
+| 0     | Baseline                                | **Complete**              |
+| 1     | Domain model + model registry           | **Complete**              |
+| 2     | Task + repository intelligence          | **Complete**              |
+| 3     | Constraint filter + static router       | **Complete**              |
+| 4     | CLI (cost model + budgets folded in)    | **Complete**              |
+| 5     | Agent adapters                          | **Complete (unverified)** |
+| 6     | Execution monitor + failure taxonomy    | **Complete**              |
+| 7     | Escalation graph + context handoff      | **Complete**              |
+| 8     | Outcome model + local telemetry         | **Complete**              |
+| 9     | Expected cost to success                | **Complete**              |
+| 10    | Learning (P(success) online)            | **Complete**              |
+| 11    | Calibration + safeguards                | **Complete**              |
+| 12    | Shadow policy                           | **Complete**              |
+| 13    | Contextual bandit + safe exploration    | **Complete**              |
+| 14    | VS Code extension                       | **Complete (unverified)** |
+| 15    | End-to-end scenarios + task runner      | **Complete**              |
+| 16    | Performance                             | **Complete**              |
+| 17    | Documentation                           | **Complete**              |
+| 18    | Final quality gate                      | **Complete**              |
+| 19    | Development behaviour                   | **Complete**              |
+| 20    | MVP scope audit                         | **Complete**              |
+| 21    | MVP milestone — `routepilot run`        | **Complete**              |
+| 22    | Closing the loop — record and learn     | **Complete**              |
+| 23    | Re-inspection and plan                  | **Complete**              |
+| 24    | `run --execute` honours plan and budget | **Complete**              |
+| 25    | Validation configuration                | Next                      |
+| 26    | Offline policy evaluation               | Not started               |
 
 Phases 10 and 11 of the _original_ roadmap (validation engine, telemetry schema)
 were folded into Phases 6 and 8 respectively and are complete. Roadmap Phase 12
@@ -850,7 +851,44 @@ now 30s, and that per-test change is reverted.
 
 ---
 
-## Phase 25 — Offline policy evaluation
+## Phase 24 — `run --execute` honours the plan and the budget (complete)
+
+An external review of the Phase 23 tree found that `routepilot run --execute`
+broke two standing invariants and one claim in the Phase 21 entry.
+
+**The plan was not provably the model that executed.** `route` routed with
+learning, calibration and exploration applied; `run` handed the runner a bare
+engine, which routed again without them; telemetry then recorded the plan
+against a run that could have executed something else. `TaskRunner.run()` now
+accepts the decision and executes it as-is, `run` passes the one it printed,
+and the recorder persists the decision on the run. Identity is asserted.
+
+**Configured limits were never applied.** `maxEscalationsPerTask` and
+`maxRetriesPerModel` were validated and ignored; `budgets.request` bounded
+selection only, so a run could spend `budget × (1 + retries + escalations)`.
+`toEscalationLimits(config)` now maps all four limits, the runner projects the
+next attempt's cost before starting it, and escalation moves only between
+candidates the router marked viable — it widens which acceptable model runs
+next and never lowers the bar.
+
+**An explicit model over budget executed anyway**, with a table marker for
+company. `budgets.onExceeded` is now applied before execution: `stop` and `ask`
+refuse with exit code 3, `ask` names `--allow-over-budget`, `allow-fallback`
+executes and prints the overspend. Nothing is exceeded silently.
+
+**One portability defect.** The analysis cache case-folded every path on every
+platform, so `npm run verify` failed on Linux. Case sensitivity is now an
+injected option, decided at the CLI edge; the core holds no platform knowledge.
+
+---
+
+## Phase 25 — Validation configuration
+
+Next. See `docs/ARCHITECTURE.md` §4, item 1.
+
+---
+
+## Phase 26 — Offline policy evaluation
 
 - Policy replay against historical data (spec section 42). The comparison set
   itself is delivered — see Phase 12 — but replay against recorded _outcomes_

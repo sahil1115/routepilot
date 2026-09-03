@@ -103,9 +103,32 @@ spending money on an attempt that cannot succeed (spec section 26).
 
 ### Stopping
 
-Escalation is bounded by `maxEscalationsPerTask` and `maxRetriesPerModel`. When
-the strongest model fails, the answer is `stop` with a reason — never an
+Escalation is bounded by four limits, all taken from configuration:
+
+| limit                   | source                                 |
+| ----------------------- | -------------------------------------- |
+| `maxEscalationsPerTask` | `routing.maxEscalationsPerTask`        |
+| `maxRetriesPerModel`    | `routing.maxRetriesPerModel`           |
+| `maxTotalCost`          | `budgets.request`                      |
+| `maxExecutionTimeMs`    | `routing.maxExecutionTimeMs`, when set |
+
+When the strongest model fails, the answer is `stop` with a reason — never an
 infinite climb. A run that exhausts its limits says which limit it hit.
+
+The cost limit is applied **before** the next attempt, not after it. The runner
+projects what the next model is expected to cost and stops if that would take
+the total past the request budget. Otherwise the budget would bound only the
+first attempt, and across retries and escalations a task could spend several
+multiples of it.
+
+### Escalation never lowers the bar
+
+Escalation moves only between models the router marked **viable** — those that
+met the confidence threshold, the risk cap, the latency cap and the budget. A
+model the router evaluated and rejected is not a fallback; it is a rejected
+model, and a vertical escalation cannot reach for it because the cheap rung
+failed. Escalation widens which _acceptable_ model runs next. It never lowers
+the bar, which is the same rule exploration is held to.
 
 ---
 

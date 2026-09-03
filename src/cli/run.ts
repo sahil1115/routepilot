@@ -25,6 +25,8 @@
  *
  * - execute with no adapter available (with the adapter's own setup guidance)
  * - execute a decision the router declined to make
+ * - execute the very agent it is running inside
+ * - exceed the request budget without either refusing or saying so
  * - commit anything, ever (principle 13)
  */
 
@@ -34,12 +36,11 @@ import { buildAdapters, buildableAdapterIds, type AdapterProbe } from '../adapte
 import { ADAPTER_VERIFICATION } from '../adapters/verification.js';
 import { TaskRunner } from '../core/run/task-runner.js';
 import { LearnedSuccessModel } from '../core/learning/success-model.js';
-import { toLearningPolicy } from '../config/policy.js';
+import { toEscalationLimits, toLearningPolicy } from '../config/policy.js';
 import { recordRun } from '../telemetry/recorder.js';
 import type { LocalStore } from '../telemetry/open.js';
 import type { RunResult } from '../core/types/run.js';
 import { ValidationEngine } from '../core/execution/validation.js';
-import { RoutingEngine } from '../core/routing/routing-engine.js';
 import { buildRegistries } from '../config/registries.js';
 import { toRoutingPolicy } from '../config/policy.js';
 import type { RoutePilotConfig } from '../config/types.js';
@@ -49,7 +50,23 @@ import type { RouteResult } from './route.js';
 
 /** Why a run did not execute. */
 export type RunRefusal =
-  'plan-only' | 'no-adapter' | 'no-model' | 'unknown-adapter' | 'nested-session';
+  | 'plan-only'
+  | 'no-adapter'
+  | 'no-model'
+  | 'unknown-adapter'
+  | 'nested-session'
+  | 'budget-exceeded';
+
+/** An overspend that was permitted, and by what. */
+export interface PermittedOverspend {
+  readonly modelId: string;
+  /** Expected total cost to success of the selected model. */
+  readonly estimate: number;
+  readonly budget: number;
+  readonly currency: string;
+  /** Configuration said allow, or the user passed `--allow-over-budget`. */
+  readonly permittedBy: 'policy' | 'flag';
+}
 
 /**
  * Adapters that cannot run inside a session of their own tool.
@@ -82,6 +99,21 @@ export interface RunCommandResult {
   readonly run: RunResult | null;
   /** Why nothing was executed, or null when something was. */
   readonly refusal: RunRefusal | null;
+  /**
+   * Set when the run knowingly exceeded the request budget.
+   *
+   * Never silent: whenever this is non-null the rendered output names the model,
+   * the estimate, the budget and what permitted it (spec section 2, rule 7).
+   */
+  readonly overspend: PermittedOverspend | null;
+  /**
+   * The configured behaviour when the budget is exceeded.
+   *
+   * Carried from the configuration the run consulted, not from the decision's
+   * policy: the two agree in the real CLI, but the rendered refusal must name
+   * the rule that was actually applied.
+   */
+  readonly onBudgetExceeded: RoutePilotConfig['budgets']['onExceeded'];
 }
 
 /** Options for {@link runTask}. */
@@ -95,6 +127,13 @@ export interface RunCommandOptions {
   readonly requestedModelId?: string | undefined;
   /** Actually execute. Absent or false produces a plan and runs nothing. */
   readonly execute?: boolean | undefined;
+  /**
+   * Run an explicitly requested model past the request budget.
+   *
+   * Only consulted when `budgets.onExceeded` is `ask`. A policy of `stop` is
+   * the configuration saying no, and a command-line flag does not outrank it.
+   */
+  readonly allowOverBudget?: boolean | undefined;
   /** Restrict to one adapter id. */
   readonly adapterId?: string | undefined;
   /** Injected for tests, so no process is ever spawned in the suite. */
@@ -116,18 +155,26 @@ export interface RunCommandOptions {
 /**
  * Run one task to a conclusion, or explain why it will not.
  *
- * The routing pass has already happened — `run` takes its result rather than
- * repeating it, so the model the plan names is provably the model that
- * executes.
+ * The routing pass has already happened. Its decision is handed to the runner
+ * to execute as-is — the runner routes nothing — which is what makes the model
+ * the plan names, by construction, the model that runs. Until Phase 24 the
+ * runner re-routed with a bare engine, so with learning or exploration in play
+ * the plan and the execution could name different models.
  */
 export async function runTask(options: RunCommandOptions): Promise<RunCommandResult> {
   const { route, config } = options;
+  const refuse = (refusal: RunRefusal, probes: readonly AdapterProbe[] = []): RunCommandResult => ({
+    route,
+    probes,
+    run: null,
+    refusal,
+    overspend: null,
+    onBudgetExceeded: config.budgets.onExceeded,
+  });
 
   // A decision the router declined is not a failure to report as one. It is a
   // legitimate answer, and executing anyway would override it.
-  if (route.decision.selectedModelId === null) {
-    return { route, probes: [], run: null, refusal: 'no-model' };
-  }
+  if (route.decision.selectedModelId === null) return refuse('no-model');
 
   const built =
     options.registry === undefined
@@ -135,24 +182,27 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
       : { registry: options.registry, probes: options.probes ?? [] };
 
   if (options.adapterId !== undefined && !buildableAdapterIds().includes(options.adapterId)) {
-    return { route, probes: built.probes, run: null, refusal: 'unknown-adapter' };
+    return refuse('unknown-adapter', built.probes);
   }
 
-  if (options.execute !== true) {
-    return { route, probes: built.probes, run: null, refusal: 'plan-only' };
-  }
+  if (options.execute !== true) return refuse('plan-only', built.probes);
 
-  if (built.registry.size === 0) {
-    return { route, probes: built.probes, run: null, refusal: 'no-adapter' };
-  }
+  if (built.registry.size === 0) return refuse('no-adapter', built.probes);
 
   // Checked after the plan branch, so a plan is always available: someone
   // inside a Claude Code session can still ask what would happen, and only
   // execution is refused.
   const nested = nestedAdapterIds(options.env ?? process.env);
   const usable = built.registry.list().filter((adapter) => !nested.includes(adapter.id));
-  if (usable.length === 0) {
-    return { route, probes: built.probes, run: null, refusal: 'nested-session' };
+  if (usable.length === 0) return refuse('nested-session', built.probes);
+
+  // A selection that knowingly exceeds the request budget is only ever an
+  // explicitly requested model (the router never picks one past the budget on
+  // its own). What happens next is the configured behaviour, and never
+  // nothing: `stop` and `ask` refuse, `allow-fallback` executes and says so.
+  const overspend = overspendOf(route.decision, options);
+  if (route.decision.budgetExceeded && overspend === null) {
+    return refuse('budget-exceeded', built.probes);
   }
 
   const { models } = buildRegistries(config);
@@ -167,8 +217,12 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
 
   const runner = new TaskRunner({
     models,
-    router: new RoutingEngine(models),
+    // No router: the decision below is executed as-is.
     executor: new RegistryExecutor(built.registry),
+    // Every limit the configuration states, including the request budget as a
+    // cap on total spend across retries and escalations. Without these the
+    // runner used built-in defaults and the budget bounded selection only.
+    limits: toEscalationLimits(config),
     ...(learned === undefined ? {} : { learned }),
     // No commands are configured, so every check reports "not run" rather than
     // "passed". Absent is not zero: a validation that did not happen must never
@@ -182,10 +236,18 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
     workspaceRoot: options.workspaceRoot,
     features: route.analysis.features,
     policy: toRoutingPolicy(config),
+    decision: route.decision,
     ...(options.requestedModelId === undefined
       ? {}
       : { requestedModelId: options.requestedModelId }),
   });
+
+  // The invariant this command exists to keep. It is the same object, not an
+  // equal one: the runner was handed the plan's decision and must not have
+  // replaced it. A violation is a programming error, so it throws.
+  if (run.decision !== route.decision) {
+    throw new Error('run executed a decision other than the one it was given');
+  }
 
   // Section 75's final step. Recording is best-effort and deliberately after
   // the run: telemetry must never be able to fail a task that already
@@ -198,7 +260,6 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
         prompt: options.task,
         workspaceRoot: options.workspaceRoot,
         features: route.analysis.features,
-        decision: route.decision,
         run,
       });
     } catch (error) {
@@ -210,7 +271,58 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
     }
   }
 
-  return { route, probes: built.probes, run, refusal: null };
+  return {
+    route,
+    probes: built.probes,
+    run,
+    refusal: null,
+    overspend,
+    onBudgetExceeded: config.budgets.onExceeded,
+  };
+}
+
+/**
+ * The permitted overspend, or null when the run is either within budget or
+ * must be refused.
+ */
+function overspendOf(
+  decision: RouteResult['decision'],
+  options: RunCommandOptions,
+): PermittedOverspend | null {
+  if (!decision.budgetExceeded || decision.selectedModelId === null) return null;
+  const budget = decision.policy.requestBudget;
+  if (budget === undefined) return null;
+
+  const behaviour = options.config.budgets.onExceeded;
+  const permittedBy: PermittedOverspend['permittedBy'] | null =
+    behaviour === 'allow-fallback'
+      ? 'policy'
+      : behaviour === 'ask' && options.allowOverBudget === true
+        ? 'flag'
+        : null;
+  if (permittedBy === null) return null;
+
+  const selected = decision.evaluations.find((e) => e.modelId === decision.selectedModelId);
+  return {
+    modelId: decision.selectedModelId,
+    estimate: selected?.cost.expectedTotalToSuccess ?? Number.NaN,
+    budget,
+    currency: decision.policy.currency,
+    permittedBy,
+  };
+}
+
+/** Name the model, the estimate and the budget, for any message about an overspend. */
+function describeOverBudget(result: RunCommandResult): string {
+  const { decision } = result.route;
+  const selected = decision.evaluations.find((e) => e.modelId === decision.selectedModelId);
+  const currency = decision.policy.currency;
+  const estimate =
+    selected === undefined
+      ? 'an unknown amount'
+      : money(selected.cost.expectedTotalToSuccess, currency);
+  const budget = money(decision.policy.requestBudget, currency);
+  return `"${decision.selectedModelId ?? 'none'}" is expected to cost ${estimate} against a request budget of ${budget}`;
 }
 
 /** Render what `run` did, or what it would have done. */
@@ -226,7 +338,7 @@ export function renderRun(result: RunCommandResult): string {
   }
 
   const currency = currencyFor(result);
-  sections.push(outcomeSection(result.run, currency));
+  sections.push(outcomeSection(result.run, currency, result.overspend));
   sections.push(attemptsSection(result.run, currency));
 
   if (result.run.escalations.length > 0) sections.push(escalationSection(result.run));
@@ -238,17 +350,22 @@ function planHeader(result: RunCommandResult): string {
   const { decision } = result.route;
   const selected = decision.evaluations.find((e) => e.modelId === decision.selectedModelId);
 
+  const entries: [string, string][] = [
+    ['model', decision.selectedModelId ?? 'none selected'],
+    ['reason', decision.reason],
+    [
+      'expected total to success',
+      selected === undefined
+        ? 'unknown'
+        : money(selected.cost.expectedTotalToSuccess, selected.cost.currency),
+    ],
+  ];
+  // The plan shows the marker; only execution has to decide what to do about it.
+  if (decision.budgetExceeded)
+    entries.push(['budget', `over budget: ${describeOverBudget(result)}`]);
+
   return `Plan (nothing executed)
-${block([
-  ['model', decision.selectedModelId ?? 'none selected'],
-  ['reason', decision.reason],
-  [
-    'expected total to success',
-    selected === undefined
-      ? 'unknown'
-      : money(selected.cost.expectedTotalToSuccess, selected.cost.currency),
-  ],
-])}`;
+${block(entries)}`;
 }
 
 function adapterSection(probes: readonly AdapterProbe[]): string | null {
@@ -307,12 +424,31 @@ function refusalSection(result: RunCommandResult): string {
         '  The router declined to select a model.',
         `  ${result.route.decision.reason}`,
       ].join('\n');
+    case 'budget-exceeded':
+      return [
+        'Cannot execute: over budget',
+        `  ${describeOverBudget(result)}.`,
+        ...(result.onBudgetExceeded === 'ask'
+          ? [
+              '',
+              '  budgets.onExceeded is "ask". To run it anyway, pass --allow-over-budget',
+              '  together with --execute.',
+            ]
+          : [
+              '',
+              '  budgets.onExceeded is "stop", so this cannot be overridden from the command line.',
+            ]),
+      ].join('\n');
     default:
       return '';
   }
 }
 
-function outcomeSection(run: RunResult, currency: string): string {
+function outcomeSection(
+  run: RunResult,
+  currency: string,
+  overspend: PermittedOverspend | null,
+): string {
   const entries: [string, string][] = [
     ['status', run.outcome],
     ['model', run.finalModelId ?? 'none'],
@@ -320,6 +456,18 @@ function outcomeSection(run: RunResult, currency: string): string {
     ['total cost', money(run.totalCost, currency)],
     ['reason', run.reason],
   ];
+  // An overspend is printed, never implied. This line is the difference between
+  // exceeding a budget and exceeding it silently.
+  if (overspend !== null) {
+    entries.push([
+      'over budget',
+      `"${overspend.modelId}" was expected to cost ${money(overspend.estimate, overspend.currency)} ` +
+        `against a request budget of ${money(overspend.budget, overspend.currency)}; executed because ` +
+        (overspend.permittedBy === 'policy'
+          ? 'budgets.onExceeded is "allow-fallback"'
+          : '--allow-over-budget was passed'),
+    ]);
+  }
   // Only present when the run stopped to ask something (spec section 30).
   if (run.question !== null) entries.push(['question', run.question]);
 

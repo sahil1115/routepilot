@@ -727,3 +727,14 @@ describe('routepilot route', () => {
     expect(result.stderr).toContain('route requires a task');
   });
 });
+
+describe('routepilot run — flags', () => {
+  it('rejects --allow-over-budget without --execute as a usage error', async () => {
+    // The flag only affects execution. Accepting it on a plan would let
+    // someone believe they had authorised an overspend when nothing was run.
+    const result = await invoke('run', 'rename a variable', '--allow-over-budget');
+
+    expect(result.code).toBe(EXIT_USAGE);
+    expect(result.stderr).toContain('--execute');
+  });
+});

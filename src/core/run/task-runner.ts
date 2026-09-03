@@ -67,7 +67,14 @@ import { priceModelTokens } from '../pricing.js';
 /** Everything the runner needs wired in. */
 export interface TaskRunnerOptions {
   readonly models: ModelRegistry;
-  readonly router: RoutingEngine;
+  /**
+   * Routes a request that arrives without a decision.
+   *
+   * Optional, because a caller that has already routed passes its decision on
+   * the request and the runner must execute exactly that. A runner with no
+   * router and no decision has nothing to run and says so.
+   */
+  readonly router?: RoutingEngine | undefined;
   readonly executor: ExecutorPort;
   /** Post-execution validation. Absent means nothing is checked. */
   readonly validation?: ValidationEngine | undefined;
@@ -86,7 +93,7 @@ export interface TaskRunnerOptions {
 /** Runs one task to a conclusion. */
 export class TaskRunner {
   readonly #models: ModelRegistry;
-  readonly #router: RoutingEngine;
+  readonly #router: RoutingEngine | undefined;
   readonly #executor: ExecutorPort;
   readonly #validation: ValidationEngine | undefined;
   readonly #learned: LearnedSuccessModel | undefined;
@@ -112,7 +119,27 @@ export class TaskRunner {
 
   /** Run one task. Never throws for a routine outcome. */
   async run(request: RunRequest): Promise<RunResult> {
-    const decision = this.#router.route({
+    // A supplied decision is executed as-is. Routing again here would let the
+    // run diverge from the plan the caller printed, and every record of the
+    // run would then be attributed to a decision that never executed.
+    const decision = request.decision ?? this.#route(request);
+
+    // The router declined. It has already decided what to say, and second
+    // guessing it here would mean two places choosing whether to spend money.
+    if (decision.selectedModelId === null) {
+      return this.#finishWithoutRunning(request, decision);
+    }
+
+    return this.#loop(request, decision, decision.selectedModelId);
+  }
+
+  #route(request: RunRequest): RoutingDecision {
+    if (this.#router === undefined) {
+      throw new Error(
+        'TaskRunner was given neither a routing decision nor a router; there is nothing to run.',
+      );
+    }
+    return this.#router.route({
       features: request.features,
       policy: request.policy,
       ...(request.requestedModelId === undefined
@@ -122,14 +149,6 @@ export class TaskRunner {
         ? {}
         : { requiredCapabilities: request.requiredCapabilities }),
     });
-
-    // The router declined. It has already decided what to say, and second
-    // guessing it here would mean two places choosing whether to spend money.
-    if (decision.selectedModelId === null) {
-      return this.#finishWithoutRunning(request, decision);
-    }
-
-    return this.#loop(request, decision, decision.selectedModelId);
   }
 
   /** Attempt, classify, escalate, repeat. */
@@ -198,6 +217,29 @@ export class TaskRunner {
         eligibleModels: this.#eligible(decision),
       });
 
+      // The budget is applied *before* the next attempt, not after. The engine
+      // stops once spend has reached the cap; on its own that permits one more
+      // attempt that lands over it, and across retries and escalations a request
+      // budget would then bound nothing. Projecting the next attempt closes
+      // that gap without touching the engine's own rules.
+      const unaffordable = this.#unaffordable(next.targetModelId, totalCost, request);
+      if (unaffordable !== null) {
+        escalations.push({
+          action: 'stop',
+          fromModelId: model.id,
+          toModelId: next.targetModelId,
+          failureType: attempt.classification.failureType,
+          reason: unaffordable,
+          modelAttributable: next.modelAttributable,
+          limitReached: 'cost',
+        });
+        return this.#finish(request, decision, attempts, escalations, totalCost, {
+          outcome: 'stopped',
+          reason: unaffordable,
+          validation: lastValidation,
+        });
+      }
+
       escalations.push({
         action: next.action,
         fromModelId: model.id,
@@ -205,6 +247,7 @@ export class TaskRunner {
         failureType: attempt.classification.failureType,
         reason: next.reason,
         modelAttributable: next.modelAttributable,
+        limitReached: next.limitReached,
       });
 
       switch (next.action) {
@@ -366,15 +409,57 @@ export class TaskRunner {
       }).totalCost;
     }
 
+    return this.#estimate(model, request);
+  }
+
+  /** What one attempt on this model is expected to cost, before it runs. */
+  #estimate(model: ModelSpec, request: RunRequest): number {
     return priceModelTokens(model, {
       inputTokens: request.features.context.estimatedInputTokens,
       outputTokens: request.features.context.estimatedOutputTokens,
     }).totalCost;
   }
 
-  /** Models the hard filter left standing, in the order the router ranked them. */
+  /**
+   * Why the next attempt cannot be afforded, or null when it can.
+   *
+   * Only a total-cost limit is projected. Time cannot be estimated for an
+   * attempt that has not started, and the engine already counts escalations
+   * and retries exactly.
+   */
+  #unaffordable(
+    targetModelId: string | null,
+    totalCost: number,
+    request: RunRequest,
+  ): string | null {
+    const cap = this.#limits.maxTotalCost;
+    if (cap === undefined || targetModelId === null) return null;
+
+    const target = this.#models.get(targetModelId);
+    if (target === undefined) return null;
+
+    const next = this.#estimate(target, request);
+    const projected = totalCost + next;
+    if (projected <= cap) return null;
+
+    return (
+      `Stopping rather than running "${target.id}": it is expected to cost ${next.toFixed(4)}, ` +
+      `which would bring the total to ${projected.toFixed(4)} against a limit of ${cap.toFixed(4)}.`
+    );
+  }
+
+  /**
+   * Models escalation may move to, in the order the router ranked them.
+   *
+   * Only candidates the router marked viable. Escalation widens which
+   * *acceptable* model runs next; it never lowers the bar, which is the same
+   * rule exploration was held to in Phase 13. Without this filter a vertical
+   * move could land on a model the router had marked over budget, below the
+   * confidence threshold or too slow, simply because it was evaluated.
+   */
   #eligible(decision: RoutingDecision): ModelSpec[] {
     return decision.evaluations
+      .filter((candidate) => candidate.viable)
       .map((candidate) => this.#models.get(candidate.modelId))
       .filter((model): model is ModelSpec => model !== undefined);
   }

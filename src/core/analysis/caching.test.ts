@@ -259,19 +259,136 @@ describe('AnalysisCache', () => {
     expect(cache.statistics.hits).toBe(0);
   });
 
-  it('treats path separators and case as the same repository', async () => {
-    const { repo, fs, analyzer } = await setup(tinyTypeScriptRepo());
+  it('treats path separators and a trailing slash as the same repository', () => {
+    // Asserted against the cache itself rather than through the analyzer: a
+    // backslash is a legal filename character on Linux, so an analyzer-level
+    // test with rewritten separators was testing the filesystem, not the key.
+    const cache = new AnalysisCache();
+    const entry = {
+      fingerprint: {
+        headCommit: null,
+        branch: null,
+        workingTree: '0',
+        fileSet: '0',
+        manifests: '0',
+      },
+      inventory: { files: [], directoriesScanned: 0, truncated: false },
+      level1: {
+        root: '/a',
+        fileCount: 0,
+        totalBytes: 0,
+        truncated: false,
+        languages: [],
+        primaryLanguage: null,
+        packageManager: null,
+        frameworks: [],
+        isMonorepo: false,
+        workspaceCount: 0,
+        hasContinuousIntegration: false,
+        git: {
+          isRepository: false,
+          branch: null,
+          headCommit: null,
+          changedFiles: [],
+          insertions: 0,
+          deletions: 0,
+        },
+        changedFiles: [],
+      },
+    };
 
-    await analyzer.analyze({ root: repo.root, level: 1 });
+    cache.set('/srv/repo', entry);
 
-    fs.reset();
-    const viaBackslashes = await analyzer.analyze({
-      root: repo.root.replace(/\//g, '\\'),
-      level: 1,
-    });
+    expect(cache.get('/srv/repo/')).toBeDefined();
+    expect(cache.get('\\srv\\repo')).toBeDefined();
+  });
 
-    expect(viaBackslashes.cache.hit).toBe(true);
-    expect(fs.counts.readDirectory).toBe(0);
+  it('folds case only when told the filesystem does', () => {
+    // On Windows and macOS `/srv/App` and `/srv/app` are one directory; on
+    // Linux they are two, and folding them would serve one repository's
+    // analysis for the other. The cache is told which, and does not guess.
+    const entry = {
+      fingerprint: {
+        headCommit: null,
+        branch: null,
+        workingTree: '0',
+        fileSet: '0',
+        manifests: '0',
+      },
+      inventory: { files: [], directoriesScanned: 0, truncated: false },
+      level1: {
+        root: '/a',
+        fileCount: 0,
+        totalBytes: 0,
+        truncated: false,
+        languages: [],
+        primaryLanguage: null,
+        packageManager: null,
+        frameworks: [],
+        isMonorepo: false,
+        workspaceCount: 0,
+        hasContinuousIntegration: false,
+        git: {
+          isRepository: false,
+          branch: null,
+          headCommit: null,
+          changedFiles: [],
+          insertions: 0,
+          deletions: 0,
+        },
+        changedFiles: [],
+      },
+    };
+
+    const insensitive = new AnalysisCache({ caseSensitive: false });
+    insensitive.set('/srv/App', entry);
+    expect(insensitive.get('/srv/app')).toBeDefined();
+
+    const sensitive = new AnalysisCache({ caseSensitive: true });
+    sensitive.set('/srv/App', entry);
+    expect(sensitive.get('/srv/app')).toBeUndefined();
+  });
+
+  it('is case-sensitive by default, because the core has no platform knowledge', () => {
+    // The safe default is never to conflate. The CLI decides per platform and
+    // passes the answer in; a core that read `process.platform` would be a core
+    // that could be wrong about it.
+    const entry = {
+      fingerprint: {
+        headCommit: null,
+        branch: null,
+        workingTree: '0',
+        fileSet: '0',
+        manifests: '0',
+      },
+      inventory: { files: [], directoriesScanned: 0, truncated: false },
+      level1: {
+        root: '/a',
+        fileCount: 0,
+        totalBytes: 0,
+        truncated: false,
+        languages: [],
+        primaryLanguage: null,
+        packageManager: null,
+        frameworks: [],
+        isMonorepo: false,
+        workspaceCount: 0,
+        hasContinuousIntegration: false,
+        git: {
+          isRepository: false,
+          branch: null,
+          headCommit: null,
+          changedFiles: [],
+          insertions: 0,
+          deletions: 0,
+        },
+        changedFiles: [],
+      },
+    };
+
+    const cache = new AnalysisCache();
+    cache.set('/srv/App', entry);
+    expect(cache.get('/srv/app')).toBeUndefined();
   });
 
   it('evicts the least recently used entry when full', () => {

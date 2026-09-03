@@ -22,6 +22,7 @@ import { NodeFileSystem } from '../infra/node-filesystem.js';
 import { NodeGit } from '../infra/node-git.js';
 import type { GitPort } from '../core/ports.js';
 
+import { AnalysisCache } from '../core/analysis/cache.js';
 /** What `analyze` produced. */
 export interface AnalyzeResult {
   readonly classification: TaskClassification;
@@ -87,6 +88,18 @@ export function chooseAnalysisLevel(classification: TaskClassification): Analysi
   return 2;
 }
 
+/**
+ * Whether this platform's default filesystem distinguishes letter case.
+ *
+ * Decided here, at the edge, so `src/core` keeps no platform knowledge. Windows
+ * and macOS fold case by default; everything else does not, and folding there
+ * would serve one repository's analysis for another whose path differs only in
+ * case.
+ */
+const FILESYSTEM_IS_CASE_SENSITIVE = !(
+  process.platform === 'win32' || process.platform === 'darwin'
+);
+
 /** Run the analysis pipeline against a real workspace. */
 export async function analyzeTask(options: AnalyzeOptions): Promise<AnalyzeResult> {
   const analyzer =
@@ -94,6 +107,7 @@ export async function analyzeTask(options: AnalyzeOptions): Promise<AnalyzeResul
     new RepositoryAnalyzer({
       fs: new NodeFileSystem(),
       git: new NodeGit(),
+      cache: new AnalysisCache({ caseSensitive: FILESYSTEM_IS_CASE_SENSITIVE }),
     });
 
   const analysisStarted = now();

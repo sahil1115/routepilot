@@ -155,6 +155,7 @@ const routingSchema = z.strictObject({
   maxLatencySeconds: z.number().positive().default(900),
   maxEscalationsPerTask: z.number().int().min(0).default(2),
   maxRetriesPerModel: z.number().int().min(0).default(1),
+  maxExecutionTimeMs: positiveInt.optional(),
   modelOverrideEnabled: z.boolean().default(false),
   defaultProviderId: identifier.optional(),
   fallbackProviderId: identifier.optional(),

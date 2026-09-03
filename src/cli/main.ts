@@ -118,6 +118,12 @@ Options for "route":
                           forbids exploration (spec section 40).
   --explain               Also print the provider-neutral explanation
 
+Options for "run":
+  --execute               Actually start the agent (default: plan only)
+  --adapter <id>          Use only this adapter
+  --allow-over-budget     With --execute: run an explicitly requested model past
+                          the request budget when budgets.onExceeded is "ask"
+
 Eligibility filters (for "models"):
   --context <tokens>      Input tokens the request must fit
   --output-tokens <n>     Output tokens the request needs room for
@@ -226,6 +232,14 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
     return EXIT_USAGE;
   }
 
+  // A flag that only affects execution, given without execution, is almost
+  // certainly a mistake — and a silent no-op would let someone believe they had
+  // authorised an overspend when they had authorised nothing.
+  if (args.allowOverBudget && !args.execute) {
+    io.err('--allow-over-budget only makes sense together with --execute.');
+    return EXIT_USAGE;
+  }
+
   const loaded = await load(args, io);
   const root = args.root ?? process.cwd();
 
@@ -269,6 +283,7 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
     workspaceRoot: root,
     task: prompt,
     execute: args.execute,
+    allowOverBudget: args.allowOverBudget,
     ...(store === undefined ? {} : { store }),
     onProblem: (message) => {
       io.err(`Note: ${message}`);
@@ -314,7 +329,10 @@ function exitCodeForRun(result: RunCommandResult): number {
   switch (result.refusal) {
     case 'plan-only':
       return EXIT_OK;
+    // Over budget is the router's answer applied at execution time, not a
+    // fault: nothing is broken, and a script can respond by raising the budget.
     case 'no-model':
+    case 'budget-exceeded':
       return EXIT_NO_MODEL;
     default:
       return EXIT_ERROR;
@@ -794,6 +812,8 @@ interface CliArgs {
   readonly adapter: string | undefined;
   /** Whether the user explicitly asked for execution. Defaults to false. */
   readonly execute: boolean;
+  /** `--allow-over-budget`: meaningful only with `--execute`. */
+  readonly allowOverBudget: boolean;
 }
 
 /**
@@ -834,6 +854,7 @@ function parseCli(argv: readonly string[]): CliArgs {
     noDegraded: parsed.flags.has('no-degraded'),
     adapter: singleValue(parsed, 'adapter'),
     execute: parsed.flags.has('execute'),
+    allowOverBudget: parsed.flags.has('allow-over-budget'),
   };
 }
 

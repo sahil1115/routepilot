@@ -219,9 +219,20 @@ const CHECKLIST = [
   { item: 'model registry works', tests: [['register']] },
   {
     item: 'budget enforcement works',
-    tests: [['budget exceeded', 'safe stop'], ['never silently exceeds']],
+    tests: [
+      ['budget exceeded', 'safe stop'],
+      ['never silently exceeds'],
+      // Phase 24: the request budget is applied during execution as well.
+      ['caps total spend'],
+      ['over the request budget'],
+      ['never lowers the bar'],
+    ],
     verdict: 'PARTIAL',
-    note: 'only the REQUEST budget is enforced; session, daily and monthly are validated and displayed but never applied',
+    note:
+      'the REQUEST budget is enforced at selection and, since Phase 24, during execution: ' +
+      'it caps total spend across retries and escalations, and an explicit model over it is ' +
+      'refused unless budgets.onExceeded permits. Session, daily and monthly are still ' +
+      'validated and displayed but never applied',
   },
   { item: 'capability filtering works', tests: [['context too large'], ['excludes models']] },
   { item: 'repository analysis works', tests: [['warm cache'], ['level 3']] },
