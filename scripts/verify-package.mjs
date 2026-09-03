@@ -124,9 +124,18 @@ const sandbox = await mkdtemp(join(tmpdir(), 'routepilot-vsix-'));
 const installed = join(sandbox, 'publisher.routepilot-0.0.0');
 
 try {
-  for (const entry of SHIPPED) {
+  // Only what a `.vsix` actually contains. vsce prunes devDependencies, so
+  // copying all of node_modules would both be slow and test the wrong tree.
+  for (const entry of ['out', 'dist', 'package.json']) {
     await cp(join(extension, entry), join(installed, entry), { recursive: true }).catch(() => {
       // Absence is already reported above when it matters.
+    });
+  }
+  for (const name of declared) {
+    await cp(join(extension, 'node_modules', name), join(installed, 'node_modules', name), {
+      recursive: true,
+    }).catch(() => {
+      // Reported above by the resolution check.
     });
   }
 

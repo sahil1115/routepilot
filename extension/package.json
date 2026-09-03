@@ -2,7 +2,7 @@
   "name": "routepilot-vscode",
   "displayName": "RoutePilot",
   "description": "Choose the cheapest path to success. Shows which coding model should handle a task, what it will cost, and why.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "license": "MIT",
   "author": "Sahil",
@@ -125,6 +125,8 @@
   },
   "devDependencies": {
     "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.6.0",
     "typescript": "~5.9.3"
   },
   "dependencies": {

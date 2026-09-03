@@ -103,9 +103,23 @@ describe('the documentation does not overclaim', () => {
     expect(readme).toMatch(/no agent adapter has been verified/i);
   });
 
-  it('does not describe the VS Code extension as verified in VS Code', async () => {
+  it('records how the VS Code extension was verified, and against which version', async () => {
+    // This guard used to assert the opposite -- that the docs still said the
+    // extension had never been run in VS Code. Phase 26 ran it in a real host,
+    // so the guard now holds the replacement claim to the same standard: a
+    // version and a way to reproduce it, not an adjective.
     const extension = await readFile(join(root, 'docs', 'EXTENSION.md'), 'utf8');
-    expect(extension).toMatch(/never been run in VS Code|Never run inside/i);
+    // `[\s>]` rather than `\s`: the claim wraps across a markdown
+    // blockquote, so a `>` sits between the words.
+    expect(extension).toMatch(/real VS Code extension[\s>]+host/i);
+    expect(extension).toMatch(/VS Code 1\.\d+/);
+    expect(extension).toContain('npm run verify:vscode');
+  });
+
+  it('still says no agent adapter has been verified', async () => {
+    // The other half of the same honesty rule, and the one still outstanding.
+    const readme = await readFile(join(root, 'README.md'), 'utf8');
+    expect(readme).toMatch(/no agent adapter has been verified/i);
   });
 
   it('names the unenforced budget scopes wherever budgets are described', async () => {

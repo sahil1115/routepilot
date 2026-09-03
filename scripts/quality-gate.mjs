@@ -318,8 +318,11 @@ const CHECKLIST = [
   },
   {
     item: 'VS Code extension tested',
-    verdict: 'PARTIAL',
-    note: '19/19 checks against a fake VS Code host; never opened in real VS Code (docs/EXTENSION.md)',
+    // Was PARTIAL until Phase 26. Now run in a real extension host, which is
+    // the thing the fake host could never establish.
+    note:
+      'verified in real VS Code 1.136.0 (Node 24.18.1): 8/8 extension-host checks ' +
+      'via "npm run verify:vscode", plus 19 against a fake host',
   },
 ];
 

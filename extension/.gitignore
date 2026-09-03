@@ -1,2 +1,4 @@
 out/
 *.vsix
+config/
+test-out/

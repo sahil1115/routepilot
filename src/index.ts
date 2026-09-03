@@ -32,7 +32,7 @@ export const TAGLINE = 'Choose the cheapest path to success.' as const;
  * nothing here has run against a real model. A major version would claim a
  * stability this has not earned.
  */
-export const VERSION = '0.2.1' as const;
+export const VERSION = '0.2.2' as const;
 
 /**
  * Implementation phase actually present in this build.

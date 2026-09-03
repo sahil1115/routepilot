@@ -11,7 +11,7 @@
  * and is not committed.
  */
 
-import { cp, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,4 +48,16 @@ await writeFile(
 `,
 );
 
+// The example configuration, too. `bundledExamplePath()` resolves it relative
+// to the core at `../../config/routepilot.example.json`, which inside the
+// extension means `extension/config/`. Without this the extension's own error
+// message points a user at a file that is not in the package -- which is
+// exactly what running in a real extension host revealed.
+await mkdir(join(root, 'extension', 'config'), { recursive: true });
+await cp(
+  join(root, 'config', 'routepilot.example.json'),
+  join(root, 'extension', 'config', 'routepilot.example.json'),
+);
+
 console.log('Copied dist/ -> extension/dist/ (marked as ESM)');
+console.log('Copied config/routepilot.example.json -> extension/config/');

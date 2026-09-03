@@ -1,7 +1,11 @@
 # The VS Code extension
 
-> **Status: built, packaged, and verified against a fake host. Never run inside
-> real VS Code.** The distinction matters and is spelled out below.
+> **Status: built, packaged, installed, and run in a real VS Code extension
+> host.** Verified on VS Code 1.136.0 (Node 24.18.1) on Windows: 8/8 checks,
+> including activation, command registration, loading the ESM core inside the
+> CommonJS host, and routing a task end to end. Reproduce with
+> `npm run verify:vscode`. What is still unverified is stated under
+> [Known limitations](#known-limitations).
 
 RoutePilot's extension shows which model would handle a task, what it is
 estimated to cost, and why. It **chooses a model; it does not run one** — the
@@ -165,6 +169,37 @@ Checking by _location_ rather than by copying the files somewhere isolated is
 deliberate: a temporary directory can itself sit under an ancestor
 `node_modules` — this machine has one — and the check would then pass for the
 wrong reason.
+
+---
+
+## Verified in a real extension host
+
+`npm run verify:vscode` launches the VS Code already installed on the machine —
+not a downloaded build — with `--extensionDevelopmentPath` and
+`--extensionTestsPath`, and runs `extension/test/host-suite.cjs` **inside** the
+host. Eight checks: the manifest is accepted, activation succeeds, every
+contributed command id is registered, the ESM core loads inside the CommonJS
+host, a task routes end to end, the telemetry store opens, and `cancel` and
+`openSettings` run.
+
+Two things had to be solved before it ran at all, and both are the kind that
+report success while doing nothing:
+
+- **Run from a terminal inside VS Code, the child inherits the parent editor.**
+  `ELECTRON_RUN_AS_NODE=1` and the `VSCODE_*` variables make `Code.exe` behave
+  as a bare Node interpreter, or hand the arguments to the running instance and
+  exit 0 immediately. The runner strips every inherited `VSCODE_*` and
+  `ELECTRON_*` variable and launches with a private `--user-data-dir`.
+- **The host's stdout does not reliably reach the parent process.** Exit code 0
+  therefore cannot distinguish "all checks passed" from "the suite never ran" —
+  and the first version of this did exactly that, reporting success on a run
+  where nothing executed. The suite now writes a JSON report and the runner
+  fails if that file is absent.
+
+Running it found a real defect that no fake host could have: the extension's
+own error message pointed at `extension/config/routepilot.example.json`, a file
+that was never packaged. It ships now, so the extension falls back to the
+bundled example exactly as the CLI does.
 
 ---
 

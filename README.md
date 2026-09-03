@@ -16,8 +16,9 @@ what it expects to cost.
 >   ever been executed against a real model.
 > - **`routepilot run` exists but plans by default.** `--execute` starts a real
 >   coding agent, and no adapter behind it has ever been verified.
-> - **The VS Code extension has never been run in VS Code.** It builds, packages
->   and passes 19 checks against a fake host.
+> - **The VS Code extension is verified in real VS Code** (1.136.0, Node
+>   24.18.1): 8/8 extension-host checks plus 19 against a fake host. It is the
+>   one integration that has been proven end to end.
 >
 > Every one of those is stated wherever it matters, not only here. See
 > [Limitations](#limitations).
@@ -156,19 +157,19 @@ Requires Node ≥ 20.11.
 
 ## What is built
 
-| capability                                                                                  | state                                         |
-| ------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Task classification and progressive repository analysis                                     | working                                       |
-| Expected-cost routing with hard constraints and budgets                                     | working                                       |
-| CLI: `route`, `analyze`, `models`, `providers`, `config`, `status`, `calibration`, `shadow` | working                                       |
-| Failure taxonomy, execution monitor, validation engine                                      | working                                       |
-| Escalation graph with compact handoffs                                                      | working                                       |
-| Outcome model and local SQLite telemetry                                                    | working                                       |
-| Learning P(success), with calibration safeguards                                            | working, **off by default**                   |
-| Shadow policies and a contextual bandit                                                     | working, **off by default**                   |
-| Task runner joining the whole pipeline                                                      | working, driven by `routepilot run`           |
-| VS Code extension                                                                           | builds and packages, **never run in VS Code** |
-| Agent adapters (Claude Code, Cursor, direct HTTP)                                           | implemented, **none verified**                |
+| capability                                                                                  | state                               |
+| ------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Task classification and progressive repository analysis                                     | working                             |
+| Expected-cost routing with hard constraints and budgets                                     | working                             |
+| CLI: `route`, `analyze`, `models`, `providers`, `config`, `status`, `calibration`, `shadow` | working                             |
+| Failure taxonomy, execution monitor, validation engine                                      | working                             |
+| Escalation graph with compact handoffs                                                      | working                             |
+| Outcome model and local SQLite telemetry                                                    | working                             |
+| Learning P(success), with calibration safeguards                                            | working, **off by default**         |
+| Shadow policies and a contextual bandit                                                     | working, **off by default**         |
+| Task runner joining the whole pipeline                                                      | working, driven by `routepilot run` |
+| VS Code extension                                                                           | **verified in real VS Code 1.136**  |
+| Agent adapters (Claude Code, Cursor, direct HTTP)                                           | implemented, **none verified**      |
 
 ---
 
@@ -181,7 +182,9 @@ The ones that would matter most if you were considering using this:
 2. **`routepilot run --execute` has never been run against a real agent.** The
    command exists and the spine is wired; every end-to-end assertion behind it
    still uses a scripted executor.
-3. **The VS Code extension has never been opened in VS Code.**
+3. **Only the extension is verified end to end.** It runs in a real VS Code
+   host; no agent adapter has been run against its real tool, which is the gap
+   that matters more.
 4. **`session`, `daily` and `monthly` budgets are not enforced.** Only `request`
    is applied.
 5. **Learning is inert in practice.** It needs 200 recorded outcomes per model,
