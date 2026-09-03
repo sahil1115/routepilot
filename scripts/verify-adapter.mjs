@@ -43,6 +43,23 @@ const target = ADAPTERS[id];
 
 if (!target) {
   console.error(`Usage: node scripts/verify-adapter.mjs <${Object.keys(ADAPTERS).join('|')}>`);
+  console.error('       [--command <path to the CLI>]');
+  process.exit(2);
+}
+
+/**
+ * An explicit path to the tool, for when it is installed but not on PATH.
+ *
+ * Installers routinely put a binary somewhere the current shell has not picked
+ * up yet -- a new PATH entry needs a new terminal -- and "not found" would then
+ * be reported as an adapter problem, which it is not.
+ */
+const commandFlag = process.argv.indexOf('--command');
+const explicitCommand =
+  commandFlag === -1 ? process.env.ROUTEPILOT_ADAPTER_COMMAND : process.argv[commandFlag + 1];
+
+if (commandFlag !== -1 && !explicitCommand) {
+  console.error('--command needs a path, for example: --command "C:\path\to\cursor-agent.exe"');
   process.exit(2);
 }
 
@@ -59,10 +76,11 @@ if (id === 'claude-code' && process.env.CLAUDECODE) {
 }
 
 const { [target.className]: Adapter } = await import(target.module);
-const adapter = new Adapter({});
+const adapter = new Adapter(explicitCommand ? { command: explicitCommand } : {});
 
 console.log(`Verifying adapter: ${id}`);
 console.log(target.note);
+if (explicitCommand) console.log(`Using command: ${explicitCommand}`);
 console.log('');
 
 // --- 1. Availability -------------------------------------------------------
