@@ -32,9 +32,12 @@ import type {
 import type { ModelSpec } from '../../core/types/model.js';
 import { probeExecutable, runProcess, type RunHandle } from '../process/runner.js';
 import { normalizeCursorEvent, normalizeCursorResult, parseLine } from './events.js';
+import { resolveCursorCommand, type ResolveOptions } from './windows-shim.js';
 
 /** Options for {@link CursorCliAdapter}. */
 export interface CursorCliAdapterOptions {
+  /** How to resolve the CLI. Injected in tests; see `windows-shim.ts`. */
+  readonly resolve?: ResolveOptions | undefined;
   readonly command?: string | undefined;
   /** Arguments placed before the adapter's own. See the Claude Code adapter. */
   readonly commandArgs?: readonly string[] | undefined;
@@ -67,14 +70,26 @@ export class CursorCliAdapter implements AgentAdapter {
 
   readonly #command: string;
   readonly #commandArgs: readonly string[];
+  readonly #resolvedVia: 'path' | 'windows-shim';
   readonly #timeoutMs: number;
   readonly #now: () => number;
   readonly #newSessionId: () => string;
   readonly #sessions = new Map<string, RunHandle>();
 
   constructor(options: CursorCliAdapterOptions = {}) {
-    this.#command = options.command ?? 'cursor-agent';
-    this.#commandArgs = options.commandArgs ?? [];
+    // On Windows the installer puts only `cursor-agent.cmd` on PATH, which
+    // `execFile` cannot launch without a shell -- and a shell is forbidden.
+    // The resolver finds the real `node.exe` and `index.js` the shim runs.
+    // Everywhere else, and whenever a caller names its own command, this
+    // returns what it was given.
+    const resolved = resolveCursorCommand(
+      options.command ?? 'cursor-agent',
+      options.commandArgs ?? [],
+      options.resolve ?? {},
+    );
+    this.#command = resolved.command;
+    this.#commandArgs = resolved.commandArgs;
+    this.#resolvedVia = resolved.via;
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#now = options.now ?? (() => Date.now());
     this.#newSessionId = options.newSessionId ?? (() => randomUUID());
@@ -110,6 +125,11 @@ export class CursorCliAdapter implements AgentAdapter {
           `The Cursor CLI was not found (tried "${this.#command}"). ` +
           `Install it from https://cursor.com/cli and ensure "cursor-agent" is on PATH, ` +
           `or point the adapter at its full path. ` +
+          (process.platform === 'win32' && this.#resolvedVia === 'path'
+            ? 'On Windows the installer provides only cursor-agent.cmd, which cannot be ' +
+              'launched without a shell; RoutePilot looks for the node.exe and index.js it ' +
+              'wraps under %LOCALAPPDATA%\cursor-agent\versions and found neither. '
+            : '') +
           `Note: the "cursor" editor launcher is a different program and cannot be used here. ` +
           `Underlying error: ${probe.detail || 'not available'}`,
       };
