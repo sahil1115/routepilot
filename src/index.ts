@@ -27,12 +27,13 @@ export const TAGLINE = 'Choose the cheapest path to success.' as const;
  * silently became "unknown" in the artefact people actually install would be
  * worse than one that cannot drift.
  *
- * 0.x rather than 1.0.0 deliberately. The routing pipeline is complete and
- * tested, but no agent adapter has been verified against its real tool, so
- * nothing here has run against a real model. A major version would claim a
+ * 0.x rather than 1.0.0 deliberately. One adapter has now run against a real
+ * model, and the VS Code extension is verified in a real host — but Cursor and
+ * the direct HTTP adapter remain unverified, and only a trivial tool-free task
+ * has been executed. A major version would claim more than that. A major version would claim a
  * stability this has not earned.
  */
-export const VERSION = '0.2.2' as const;
+export const VERSION = '0.3.0' as const;
 
 /**
  * Implementation phase actually present in this build.

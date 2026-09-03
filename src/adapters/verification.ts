@@ -56,16 +56,20 @@ export interface AdapterVerification {
 /**
  * The verification table.
  *
- * **No adapter that talks to an external tool is verified.** They are
- * implemented against documented CLI surfaces and covered by tests that drive
- * real child processes, but none has been executed against its real tool end to
- * end, so none is claimed to work. Only `fake` is verified, and only because it
- * has no external tool to be wrong about.
+ * `claude-code` is verified: on 2026-09-03 it executed a real task against
+ * Claude Haiku 4.5 through Claude Code 2.1.72 and returned `completed`. That is
+ * the first and so far only adapter to have run against a real model.
+ *
+ * The others are not. `cursor-cli` cannot be verified here because the tool is
+ * not installed, and `direct-provider` has never been given a credential. Both
+ * are implemented against documented surfaces and covered by tests that drive
+ * real child processes — which proves they handle the shapes they were told to
+ * expect, not that those are the shapes the tools emit.
  */
 export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   {
     adapterId: 'claude-code',
-    status: 'unverified',
+    status: 'verified',
     mechanism:
       'Wraps the documented `claude` CLI in non-interactive print mode: ' +
       '`claude -p <prompt> --output-format stream-json --verbose --model <id>`. ' +
@@ -73,14 +77,28 @@ export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
     howToVerify:
       'In a normal terminal (not inside a Claude Code session), run: ' +
       'npm run verify:adapters -- claude-code',
+    evidence: {
+      date: '2026-09-03',
+      toolVersion: '2.1.72',
+      note:
+        'Ran a trivial task end to end against Claude Haiku 4.5 ' +
+        '(claude-haiku-4-5-20251001) on Windows, Node 22.18.0. Result: completed in ' +
+        '3352 ms, no failure type, usage reported as 10 input / 40 output / 0 cached ' +
+        'tokens. Observed event kinds in order: assistant-message, assistant-message, ' +
+        'assistant-message, completed. Recorded from the machine-written report at ' +
+        '.routepilot/adapter-verification-claude-code.json, not from a transcript.',
+    },
     limitations: [
-      'CONFIRMED against the real tool: availability detection and version parsing. ' +
-        '`getStatus()` was run against a real Claude Code 2.1.72 install and correctly ' +
-        'reported available with the right version.',
-      'NOT CONFIRMED: execution, streaming, the stream-json event schema, usage reporting, ' +
-        'cancellation or timeout behaviour against the real tool. These are covered only by ' +
-        'stub-process tests, which prove the adapter handles the shapes it was told to ' +
-        'expect — not that those are the shapes Claude Code emits.',
+      'CONFIRMED against the real tool: availability detection, version parsing, ' +
+        'process spawning, the stream-json event schema, event normalisation through to a ' +
+        'terminal `completed`, and usage reporting.',
+      'NOT CONFIRMED: cancellation, timeout behaviour, failure classification from real ' +
+        'errors, and any task that requires tool use. The verification prompt is ' +
+        'deliberately trivial and forbids tools, so it exercises the transport and the ' +
+        'event schema rather than the agent doing real work.',
+      'Tool permission is unaddressed: the adapter passes no `permissionMode`, and in ' +
+        'print mode Claude Code cannot prompt. A task that needs to edit files may ' +
+        'therefore still fail, and that has not been tried.',
       'Claude Code refuses to run nested inside another Claude Code session, so execution ' +
         'cannot be verified from an agent session — it must be run from a plain terminal.',
       'The argument list is built from flags read from `claude --help` on version 2.1.72: ' +

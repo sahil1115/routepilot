@@ -308,8 +308,11 @@ const CHECKLIST = [
   },
   {
     item: 'Claude Code adapter tested',
-    verdict: 'CANNOT VERIFY',
-    note: 'availability and version detection confirmed against a real install; execution has never been run. `npm run verify:adapters -- claude-code`, from a plain terminal',
+    // Was CANNOT VERIFY until 2026-09-03, when it ran against a real model.
+    note:
+      'verified 2026-09-03 against Claude Code 2.1.72 and Claude Haiku 4.5: a real task ' +
+      'completed in 3352 ms with usage reported. Cancellation, timeouts and tool-using ' +
+      'tasks remain unverified',
   },
   {
     item: 'Cursor adapter tested',

@@ -719,9 +719,40 @@ describe('agent registry', () => {
 // ---------------------------------------------------------------------------
 
 describe('verification honesty (spec section 2, rule 20)', () => {
-  it('marks every external-tool adapter as not verified', () => {
-    for (const id of ['claude-code', 'cursor-cli', 'direct-provider']) {
-      expect(isSupported(id), `${id} must not claim to be supported`).toBe(false);
+  it('claims support only for adapters that have actually run', () => {
+    // This asserted that *no* external-tool adapter was supported, which was
+    // right for as long as none had been run. On 2026-09-03 the Claude Code
+    // adapter executed a real task against Claude Haiku 4.5, so the invariant
+    // is now the one that will still be true after the next adapter is
+    // verified: support follows evidence, in both directions.
+    for (const entry of ADAPTER_VERIFICATION) {
+      if (entry.adapterId === 'fake') continue;
+      expect(
+        isSupported(entry.adapterId),
+        `${entry.adapterId}: support must match its verification status`,
+      ).toBe(entry.status === 'verified' && entry.evidence !== undefined);
+    }
+  });
+
+  it('still has adapters that are not verified, and does not hide them', () => {
+    // The moment every adapter is marked verified this fails, which is the
+    // point: it must take a deliberate edit here to make that claim, not a
+    // quiet flip of one field.
+    const unverified = ADAPTER_VERIFICATION.filter(
+      (entry) => entry.adapterId !== 'fake' && entry.status !== 'verified',
+    );
+    expect(unverified.map((entry) => entry.adapterId)).toEqual(['cursor-cli', 'direct-provider']);
+  });
+
+  it('names the tool version in the evidence of anything verified', () => {
+    // A date and a note are not enough to reproduce a run. The version of the
+    // external tool is what makes the claim checkable a year later.
+    for (const entry of ADAPTER_VERIFICATION) {
+      if (entry.status !== 'verified' || entry.adapterId === 'fake') continue;
+      expect(
+        entry.evidence?.toolVersion,
+        `${entry.adapterId} evidence has no tool version`,
+      ).toMatch(/\d/);
     }
   });
 

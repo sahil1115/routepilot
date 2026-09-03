@@ -90,17 +90,21 @@ describe('internal links resolve', () => {
 });
 
 describe('the documentation does not overclaim', () => {
-  it('says somewhere prominent that no adapter is verified', async () => {
-    // The single most important caveat in the project. If an adapter is ever
-    // genuinely verified this test should be updated deliberately, not deleted
-    // because it became inconvenient.
+  it('names which adapters are still unverified, rather than implying all are', async () => {
+    // This guard used to assert the README said *no* adapter was verified. On
+    // 2026-09-03 the Claude Code adapter ran against a real model, so the claim
+    // changed -- deliberately, and only after a machine-written report existed.
+    // What it must never do is round "one of three" up to "verified".
     const unverified = ADAPTER_VERIFICATION.filter(
       (entry) => entry.adapterId !== 'fake' && entry.status !== 'verified',
     );
     expect(unverified.length).toBeGreaterThan(0);
 
     const readme = await readFile(join(root, 'README.md'), 'utf8');
-    expect(readme).toMatch(/no agent adapter has been verified/i);
+    for (const entry of unverified) {
+      expect(readme.toLowerCase()).toContain(entry.adapterId.split('-')[0]);
+    }
+    expect(readme).toMatch(/unverified/i);
   });
 
   it('records how the VS Code extension was verified, and against which version', async () => {
@@ -116,10 +120,13 @@ describe('the documentation does not overclaim', () => {
     expect(extension).toContain('npm run verify:vscode');
   });
 
-  it('still says no agent adapter has been verified', async () => {
-    // The other half of the same honesty rule, and the one still outstanding.
+  it('records how the verified adapter was verified, with a date and a version', async () => {
+    // Evidence, not an adjective -- the same standard the extension claim is
+    // held to. `adapters.test.ts` already requires the evidence object; this
+    // requires the README to say what it was.
     const readme = await readFile(join(root, 'README.md'), 'utf8');
-    expect(readme).toMatch(/no agent adapter has been verified/i);
+    expect(readme).toMatch(/2\.1\.72|Claude Haiku 4\.5/);
+    expect(readme).toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
   it('names the unenforced budget scopes wherever budgets are described', async () => {
