@@ -43,7 +43,7 @@ const target = ADAPTERS[id];
 
 if (!target) {
   console.error(`Usage: node scripts/verify-adapter.mjs <${Object.keys(ADAPTERS).join('|')}>`);
-  console.error('       [--command <path to the CLI>]');
+  console.error('       [--command <path to the CLI>] [--command-args <arg>]');
   process.exit(2);
 }
 
@@ -57,6 +57,26 @@ if (!target) {
 const commandFlag = process.argv.indexOf('--command');
 const explicitCommand =
   commandFlag === -1 ? process.env.ROUTEPILOT_ADAPTER_COMMAND : process.argv[commandFlag + 1];
+
+/**
+ * Arguments placed before the adapter's own.
+ *
+ * Needed on Windows, where the Cursor CLI's entry point on PATH is a `.cmd`
+ * shim. `execFile` cannot launch a `.cmd` without a shell, and
+ * `docs/SECURITY.md` forbids one -- spawning it returns EINVAL. The shim
+ * ultimately runs `node.exe index.js`, both real files, so pointing `--command`
+ * at that node and passing the script through here reaches the same CLI by a
+ * path the adapter is allowed to take.
+ */
+const commandArgs = [];
+for (let i = 0; i < process.argv.length; i += 1) {
+  if (process.argv[i] === '--command-args' && process.argv[i + 1]) {
+    commandArgs.push(process.argv[i + 1]);
+  }
+}
+if (commandArgs.length === 0 && process.env.ROUTEPILOT_ADAPTER_COMMAND_ARGS) {
+  commandArgs.push(process.env.ROUTEPILOT_ADAPTER_COMMAND_ARGS);
+}
 
 if (commandFlag !== -1 && !explicitCommand) {
   console.error('--command needs a path, for example: --command "C:\path\to\cursor-agent.exe"');
@@ -76,11 +96,15 @@ if (id === 'claude-code' && process.env.CLAUDECODE) {
 }
 
 const { [target.className]: Adapter } = await import(target.module);
-const adapter = new Adapter(explicitCommand ? { command: explicitCommand } : {});
+const adapter = new Adapter({
+  ...(explicitCommand ? { command: explicitCommand } : {}),
+  ...(commandArgs.length > 0 ? { commandArgs } : {}),
+});
 
 console.log(`Verifying adapter: ${id}`);
 console.log(target.note);
 if (explicitCommand) console.log(`Using command: ${explicitCommand}`);
+if (commandArgs.length > 0) console.log(`Leading args : ${commandArgs.join(' ')}`);
 console.log('');
 
 // --- 1. Availability -------------------------------------------------------
