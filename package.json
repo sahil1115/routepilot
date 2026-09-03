@@ -1,0 +1,62 @@
+{
+  "name": "routepilot",
+  "version": "0.0.0",
+  "private": true,
+  "description": "RoutePilot \u00e2\u20ac\u201d choose the cheapest path to success. An intelligent coding-agent model router.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "config/routepilot.example.json",
+    "config/README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
+    "verify:adapters": "node scripts/verify-adapter.mjs",
+    "build:extension": "npm run build && node scripts/sync-extension-core.mjs && tsc -p extension/tsconfig.json",
+    "verify:extension": "npm run build:extension && node extension/scripts/verify-extension.cjs",
+    "package:extension": "npm run build:extension && npm --prefix extension run package",
+    "bench": "npm run build && node bench/benchmark.mjs",
+    "phase": "node scripts/phase-check.mjs",
+    "gate": "node scripts/quality-gate.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "@types/vscode": "1.90.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
+  "bin": {
+    "routepilot": "./dist/cli/main.js"
+  }
+}

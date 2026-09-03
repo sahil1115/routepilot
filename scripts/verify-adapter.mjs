@@ -1,0 +1,146 @@
+#!/usr/bin/env node
+/**
+ * Real-execution verification for an agent adapter.
+ *
+ * Mock tests prove an adapter handles the shapes it was told to expect. Only a
+ * real run proves those are the shapes the tool actually emits. Until this
+ * script has been run and its output recorded in
+ * `src/adapters/verification.ts`, an adapter stays `unverified` and RoutePilot
+ * does not claim it works (spec section 2, rule 20).
+ *
+ * Usage:
+ *   node scripts/verify-adapter.mjs claude-code
+ *   node scripts/verify-adapter.mjs cursor-cli
+ *
+ * This spends real quota or money: it asks a real agent to do a trivial task in
+ * a throwaway directory. Nothing in your repository is touched.
+ */
+
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const ADAPTERS = {
+  'claude-code': {
+    module: '../dist/adapters/claude-code/adapter.js',
+    className: 'ClaudeCodeAdapter',
+    modelId: 'haiku',
+    note: 'Claude Code must be run from a plain terminal, not inside a Claude Code session.',
+  },
+  'cursor-cli': {
+    module: '../dist/adapters/cursor/adapter.js',
+    className: 'CursorCliAdapter',
+    modelId: 'auto',
+    note: 'Requires `cursor-agent` on PATH.',
+  },
+};
+
+const id = process.argv[2];
+const target = ADAPTERS[id];
+
+if (!target) {
+  console.error(`Usage: node scripts/verify-adapter.mjs <${Object.keys(ADAPTERS).join('|')}>`);
+  process.exit(2);
+}
+
+if (id === 'claude-code' && process.env.CLAUDECODE) {
+  console.error(
+    'Refusing to run: this looks like a Claude Code session (CLAUDECODE is set).\n' +
+      'Claude Code cannot run nested inside itself. Run this from a plain terminal.',
+  );
+  process.exit(2);
+}
+
+const { [target.className]: Adapter } = await import(target.module);
+const adapter = new Adapter({});
+
+console.log(`Verifying adapter: ${id}`);
+console.log(target.note);
+console.log('');
+
+// --- 1. Availability -------------------------------------------------------
+const status = await adapter.getStatus();
+console.log(`status.available : ${status.available}`);
+console.log(`status.version   : ${status.version ?? '(unknown)'}`);
+if (!status.available) {
+  console.error(`\nNot available:\n${status.detail}`);
+  process.exit(1);
+}
+
+// --- 2. A real, trivial run in a throwaway directory -----------------------
+const dir = await mkdtemp(join(tmpdir(), 'routepilot-verify-'));
+await writeFile(join(dir, 'NOTES.md'), '# notes\n', 'utf8');
+
+const model = {
+  id: `verify/${target.modelId}`,
+  providerId: 'verify',
+  modelId: target.modelId,
+  displayName: target.modelId,
+  tier: 'cheap',
+  contextWindow: 200000,
+  pricing: { inputPerMillion: 0, outputPerMillion: 0, currency: 'USD' },
+  capabilities: {
+    toolUse: true,
+    agenticExecution: true,
+    streaming: true,
+    structuredOutput: true,
+    vision: false,
+  },
+  latency: { firstTokenSeconds: 1, outputTokensPerSecond: 100 },
+  availability: 'available',
+  priors: { skills: {}, languages: {} },
+};
+
+const request = {
+  requestId: 'verify-1',
+  prompt: 'Reply with exactly the word OK. Do not use any tools.',
+  workspaceRoot: dir,
+  taskType: 'explanation',
+  requiredCapabilities: { toolUse: true },
+};
+
+console.log(`\nRunning a trivial task in ${dir} …\n`);
+
+const started = Date.now();
+const session = await adapter.execute(request, model);
+
+const kinds = [];
+for await (const event of session.events) {
+  kinds.push(event.kind);
+  console.log(`  event: ${event.kind}${event.summary ? ` — ${event.summary}` : ''}`);
+}
+
+const result = await session.result;
+const elapsed = Date.now() - started;
+
+await rm(dir, { recursive: true, force: true });
+
+// --- 3. Report -------------------------------------------------------------
+console.log('');
+console.log(`result.status    : ${result.status}`);
+console.log(`result.failure   : ${result.failureType ?? '(none)'}`);
+console.log(`result.usage     : ${JSON.stringify(result.usage ?? null)}`);
+console.log(`event kinds      : ${kinds.join(', ') || '(none)'}`);
+console.log(`elapsed          : ${elapsed}ms`);
+
+const ok = result.status === 'completed' && kinds.includes('completed');
+
+console.log('');
+if (ok) {
+  console.log('PASS — the adapter completed a real run.');
+  console.log('');
+  console.log('To record this, set the entry in src/adapters/verification.ts to:');
+  console.log(`  status: 'verified',`);
+  console.log(`  evidence: {`);
+  console.log(`    date: '${new Date().toISOString().slice(0, 10)}',`);
+  console.log(`    toolVersion: '${status.version ?? 'unknown'}',`);
+  console.log(`    note: 'Ran a trivial task end to end; observed events: ${kinds.join(', ')}.',`);
+  console.log(`  },`);
+} else {
+  console.log('FAIL — the adapter did not complete a real run.');
+  console.log(`Error summary: ${result.errorSummary ?? '(none)'}`);
+  console.log('');
+  console.log('Leave the adapter marked unverified and fix the normalisation first.');
+}
+
+process.exit(ok ? 0 : 1);

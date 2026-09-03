@@ -1,0 +1,132 @@
+{
+  "name": "routepilot-vscode",
+  "displayName": "RoutePilot",
+  "description": "Choose the cheapest path to success. Shows which coding model should handle a task, what it will cost, and why.",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "routepilot.route",
+        "title": "Route a task",
+        "category": "RoutePilot"
+      },
+      {
+        "command": "routepilot.explain",
+        "title": "Explain the last routing decision",
+        "category": "RoutePilot"
+      },
+      {
+        "command": "routepilot.history",
+        "title": "Show recent history",
+        "category": "RoutePilot"
+      },
+      {
+        "command": "routepilot.cancel",
+        "title": "Cancel the running analysis",
+        "category": "RoutePilot"
+      },
+      {
+        "command": "routepilot.openSettings",
+        "title": "Open settings",
+        "category": "RoutePilot"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "routepilot.participant",
+        "name": "routepilot",
+        "fullName": "RoutePilot",
+        "description": "Which model should handle this, and what will it cost?",
+        "isSticky": false
+      }
+    ],
+    "configuration": {
+      "title": "RoutePilot",
+      "properties": {
+        "routepilot.configPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to `routepilot.config.json`. Empty means discover it from the workspace."
+        },
+        "routepilot.requestBudget": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": 0,
+          "markdownDescription": "Spending limit for one request. **May only lower the configured budget, never raise it** \u00e2\u20ac\u201d a workspace settings file arrives with a repository and is not trusted to widen a limit."
+        },
+        "routepilot.minimumSuccessProbability": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "minimum": 0,
+          "maximum": 1,
+          "markdownDescription": "Minimum acceptable success probability. **May only raise the configured threshold, never lower it.**"
+        },
+        "routepilot.exploration.enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null,
+          "markdownDescription": "Allow deliberate experiments. **May only switch exploration off, never on** \u00e2\u20ac\u201d enabling it is a decision for the configuration file, not for a repository you cloned."
+        },
+        "routepilot.operationMode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "production",
+            "critical"
+          ],
+          "default": "production",
+          "markdownDescription": "Where this workspace runs. **May only become stricter than the configuration.** `production` and `critical` forbid exploration entirely."
+        },
+        "routepilot.analysisLevel": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "enum": [
+            1,
+            2,
+            3,
+            null
+          ],
+          "default": null,
+          "markdownDescription": "Repository analysis depth. Deeper is slower and more accurate. Empty means chosen from the task."
+        },
+        "routepilot.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the model and cost indicator in the status bar."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node ../scripts/sync-extension-core.mjs && tsc -p tsconfig.json",
+    "package": "vsce package --allow-missing-repository --skip-license --out routepilot.vsix"
+  },
+  "devDependencies": {
+    "@types/vscode": "1.90.0",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  }
+}

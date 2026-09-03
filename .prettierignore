@@ -1,0 +1,8 @@
+dist
+coverage
+node_modules
+package-lock.json
+extension/dist
+extension/out
+extension/node_modules
+extension/routepilot.vsix

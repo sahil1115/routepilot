@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "anthropic",
+      "displayName": "Anthropic",
+      "kind": "cloud",
+      "endpoint": "https://api.anthropic.com",
+      "auth": {
+        "kind": "apiKey",
+        "envVar": "ANTHROPIC_API_KEY"
+      },
+      "timeoutMs": 600000,
+      "retry": {
+        "maxAttempts": 3,
+        "initialDelayMs": 500,
+        "backoffMultiplier": 2,
+        "maxDelayMs": 30000
+      },
+      "availability": "available",
+      "tags": ["example"]
+    }
+  ],
+  "models": [
+    {
+      "id": "anthropic/haiku-4-5",
+      "providerId": "anthropic",
+      "modelId": "claude-haiku-4-5",
+      "displayName": "Claude Haiku 4.5",
+      "tier": "cheap",
+      "contextWindow": 200000,
+      "pricing": {
+        "inputPerMillion": 1.0,
+        "outputPerMillion": 5.0,
+        "currency": "USD",
+        "verifiedAt": "2026-06-24"
+      },
+      "capabilities": {
+        "toolUse": true,
+        "agenticExecution": true,
+        "streaming": true,
+        "structuredOutput": true,
+        "vision": true
+      },
+      "latency": {
+        "firstTokenSeconds": 0.8,
+        "outputTokensPerSecond": 120
+      },
+      "availability": "available",
+      "priors": {
+        "skills": {
+          "codeGeneration": 0.72,
+          "codeEditing": 0.72,
+          "debugging": 0.62,
+          "refactoring": 0.62,
+          "architecture": 0.5,
+          "reasoning": 0.62,
+          "testGeneration": 0.7,
+          "documentation": 0.8,
+          "multiFileReasoning": 0.55
+        },
+        "languages": {
+          "typescript": 0.72,
+          "python": 0.72
+        }
+      },
+      "tags": ["example"]
+    },
+    {
+      "id": "anthropic/sonnet-5",
+      "providerId": "anthropic",
+      "modelId": "claude-sonnet-5",
+      "displayName": "Claude Sonnet 5",
+      "tier": "medium",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMillion": 2.0,
+        "outputPerMillion": 10.0,
+        "currency": "USD",
+        "verifiedAt": "2026-06-24"
+      },
+      "capabilities": {
+        "toolUse": true,
+        "agenticExecution": true,
+        "streaming": true,
+        "structuredOutput": true,
+        "vision": true
+      },
+      "latency": {
+        "firstTokenSeconds": 1.2,
+        "outputTokensPerSecond": 90
+      },
+      "availability": "available",
+      "priors": {
+        "skills": {
+          "codeGeneration": 0.86,
+          "codeEditing": 0.86,
+          "debugging": 0.82,
+          "refactoring": 0.84,
+          "architecture": 0.76,
+          "reasoning": 0.82,
+          "testGeneration": 0.84,
+          "documentation": 0.86,
+          "multiFileReasoning": 0.8
+        },
+        "languages": {
+          "typescript": 0.86,
+          "python": 0.86
+        }
+      },
+      "tags": ["example"]
+    },
+    {
+      "id": "anthropic/opus-5",
+      "providerId": "anthropic",
+      "modelId": "claude-opus-5",
+      "displayName": "Claude Opus 5",
+      "tier": "frontier",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMillion": 5.0,
+        "outputPerMillion": 25.0,
+        "currency": "USD",
+        "verifiedAt": "2026-06-24"
+      },
+      "capabilities": {
+        "toolUse": true,
+        "agenticExecution": true,
+        "streaming": true,
+        "structuredOutput": true,
+        "vision": true
+      },
+      "latency": {
+        "firstTokenSeconds": 2.0,
+        "outputTokensPerSecond": 65
+      },
+      "availability": "available",
+      "priors": {
+        "skills": {
+          "codeGeneration": 0.93,
+          "codeEditing": 0.93,
+          "debugging": 0.92,
+          "refactoring": 0.92,
+          "architecture": 0.9,
+          "reasoning": 0.93,
+          "testGeneration": 0.91,
+          "documentation": 0.9,
+          "multiFileReasoning": 0.92
+        },
+        "languages": {
+          "typescript": 0.93,
+          "python": 0.93
+        }
+      },
+      "tags": ["example"]
+    },
+    {
+      "id": "anthropic/fable-5",
+      "providerId": "anthropic",
+      "modelId": "claude-fable-5",
+      "displayName": "Claude Fable 5",
+      "tier": "ultra",
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "pricing": {
+        "inputPerMillion": 10.0,
+        "outputPerMillion": 50.0,
+        "currency": "USD",
+        "verifiedAt": "2026-06-24"
+      },
+      "capabilities": {
+        "toolUse": true,
+        "agenticExecution": true,
+        "streaming": true,
+        "structuredOutput": true,
+        "vision": true
+      },
+      "latency": {
+        "firstTokenSeconds": 3.0,
+        "outputTokensPerSecond": 55
+      },
+      "availability": "available",
+      "priors": {
+        "skills": {
+          "codeGeneration": 0.95,
+          "codeEditing": 0.95,
+          "debugging": 0.95,
+          "refactoring": 0.94,
+          "architecture": 0.94,
+          "reasoning": 0.96,
+          "testGeneration": 0.93,
+          "documentation": 0.91,
+          "multiFileReasoning": 0.95
+        },
+        "languages": {
+          "typescript": 0.95,
+          "python": 0.95
+        }
+      },
+      "constraints": {
+        "requiresExplicitOptIn": true,
+        "notes": "Highest cost tier. Opted into deliberately, never selected by accident."
+      },
+      "tags": ["example"]
+    }
+  ],
+  "routing": {
+    "minimumSuccessProbability": 0.85,
+    "maxRisk": 0.5,
+    "maxLatencySeconds": 900,
+    "maxEscalationsPerTask": 2,
+    "maxRetriesPerModel": 1,
+    "modelOverrideEnabled": false,
+    "defaultProviderId": "anthropic"
+  },
+  "budgets": {
+    "currency": "USD",
+    "request": 1.0,
+    "session": 10.0,
+    "daily": 25.0,
+    "monthly": 300.0,
+    "onExceeded": "ask"
+  },
+  "learning": {
+    "enabled": false,
+    "exploration": {
+      "enabled": false,
+      "minimumObservations": 200,
+      "maxRisk": 0.3,
+      "maxCostPremium": 0.25,
+      "optimism": 1.5
+    },
+    "minimumTrainingSamples": 200,
+    "calibration": {
+      "minimumSamples": 50,
+      "maxExpectedCalibrationError": 0.15,
+      "maxCalibrationError": 0.3,
+      "minimumBrierSkillScore": 0.02,
+      "requireCalibration": false
+    }
+  },
+  "telemetry": {
+    "enabled": true,
+    "privacyMode": "strict"
+  }
+}

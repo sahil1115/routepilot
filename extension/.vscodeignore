@@ -1,0 +1,10 @@
+# Sources and build inputs: the extension ships compiled output only.
+src/**
+scripts/**
+tsconfig.json
+.gitignore
+**/*.ts
+**/*.map
+
+# The core's declarations are for development, not for the extension host.
+dist/**/*.d.ts

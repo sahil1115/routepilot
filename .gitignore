@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# test / coverage
+coverage/
+.vitest/
+
+# local telemetry + runtime state (spec §33 — never committed)
+.routepilot/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# secrets (spec §34 — never committed, never logged)
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# logs
+*.log
+npm-debug.log*
+
+# local development log — kept on disk, not published
+logs.md
