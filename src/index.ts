@@ -33,7 +33,7 @@ export const TAGLINE = 'Choose the cheapest path to success.' as const;
  * has been executed. A major version would claim more than that. A major version would claim a
  * stability this has not earned.
  */
-export const VERSION = '0.6.0' as const;
+export const VERSION = '0.6.1' as const;
 
 /**
  * Implementation phase actually present in this build.
