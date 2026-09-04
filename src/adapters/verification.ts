@@ -67,9 +67,11 @@ export interface AdapterVerification {
  * child processes — which proves it handles the shapes it was told to expect,
  * not that those are the shapes the tool emits.
  *
- * "Verified" here means a real task ran end to end. It does not mean an adapter
- * is finished: both verified adapters ran a trivial, tool-free prompt, and
- * neither has been asked to edit a file.
+ * "Verified" here means a real task ran end to end. As of 2026-09-04 both
+ * verified adapters have also been driven through four real coding tasks
+ * against a throwaway fixture repository, with every assertion made against the
+ * filesystem rather than the transcript. Claude Code passes all four only when
+ * a permission mode is set; see its limitations.
  */
 export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   {
@@ -97,26 +99,30 @@ export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
       'CONFIRMED against the real tool: availability detection, version parsing, ' +
         'process spawning, the stream-json event schema, event normalisation through to a ' +
         'terminal `completed`, and usage reporting.',
-      'CONFIRMED with real work: reading files, tool use, and cancellation mid-run. ' +
-        'Four real coding tasks were run on 2026-09-04 against 2.1.72 with no permission ' +
-        'mode passed; the two read-only ones passed.',
-      'DISCONFIRMED, and this is the important one: with no `--permission-mode`, ' +
-        'Claude Code CANNOT WRITE FILES in print mode, and does not say so. Asked to fix ' +
-        'a failing test it emitted tool-call and tool-result events, reported ' +
-        '`status: completed`, and changed nothing; asked to create a file it did the ' +
-        'same. A caller trusting that verdict would record both as ' +
-        'successes. RoutePilot does not, because validation runs afterwards and the ' +
-        'fixture tests still failed -- which is exactly the case the Phase 25 ' +
-        '`unverified` outcome exists for.',
-      'Whether a permission mode fixes this is UNTESTED. 2.1.72 offers acceptEdits, ' +
-        'bypassPermissions, default, dontAsk, plan and auto; only `acceptEdits` is scoped ' +
-        'to edits, and `bypassPermissions` grants everything and should not be a default. ' +
-        'Set one under `agents.claude-code.permissionMode` and re-run ' +
-        '`npm run verify:agent-tasks -- claude-code` from a plain terminal.',
+      'CONFIRMED with real work, and this is the substantive result: on 2026-09-04, ' +
+        'with `agents.claude-code.permissionMode` set to `acceptEdits`, all four fixture ' +
+        'tasks passed against 2.1.72 -- modifying a file and running its test suite, ' +
+        'creating a file, declining to fabricate a missing one, and cancelling mid-run. ' +
+        'Every assertion observed the filesystem or the process, never the transcript.',
+      'CONDITIONAL: that result depends on the permission mode. With none passed, the ' +
+        'same suite scores 2/4. Claude Code cannot prompt for tool permission in print ' +
+        'mode, so it declines every write -- confirmed by `is_error: true` on each Edit ' +
+        'and Bash tool result while Read and Glob succeeded, with the model narrating ' +
+        '"the system is asking for permission to edit the file". RoutePilot passes no ' +
+        'permission mode by default and will not choose one for a user.',
+      'The blocked case USED TO REPORT SUCCESS. Claude Code emits a tidy ' +
+        '`subtype: "success"` having been refused throughout, and the adapter relayed ' +
+        '`status: completed`. It now reports `failed` / ENVIRONMENT_FAILURE when tool ' +
+        'calls were refused and no file changed -- an environment failure, never ' +
+        'MODEL_WEAKNESS, because the model was not permitted to try (spec section 22).',
+      '`bypassPermissions` also exists and grants everything. It is deliberately not ' +
+        'recommended and is not a default; `acceptEdits` is the narrowest mode that ' +
+        'lets a coding task do its job.',
       'NOT CONFIRMED: timeout behaviour, and failure classification from real provider ' +
         'errors.',
-      'Claude Code refuses to run nested inside another Claude Code session, so execution ' +
-        'cannot be verified from an agent session — it must be run from a plain terminal.',
+      'Claude Code refuses to run nested inside another Claude Code session. Clearing ' +
+        'CLAUDECODE and CLAUDE_CODE_ENTRYPOINT in the child environment lifts the refusal, ' +
+        'which is how the 2026-09-04 run was obtained; a plain terminal needs no workaround.',
       'The argument list is built from flags read from `claude --help` on version 2.1.72: ' +
         '--print, --output-format stream-json, --verbose, --model, --session-id.',
       'Transparent interception of Claude Code traffic is NOT implemented and is not ' +

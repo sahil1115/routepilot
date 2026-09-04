@@ -81,6 +81,69 @@ function normalizeSystem(event: Record<string, unknown>, now: number): AgentEven
  * an array of blocks. A `tool_use` block is the signal RoutePilot cares about;
  * text blocks become a short summary.
  */
+/**
+ * The file a `tool_use` block names, if any.
+ *
+ * Claude Code uses `file_path` for most tools and `path` for some -- both were
+ * observed in a single run against 2.1.72 -- so both are read.
+ */
+function pathOf(block: Record<string, unknown>): string | null {
+  const input = asRecord(block['input']);
+  if (input === null) return null;
+  return asString(input['file_path'] ?? null) ?? asString(input['path'] ?? null);
+}
+
+/** One tool invocation, correlated to its result by `id`. */
+export interface ToolUse {
+  readonly id: string;
+  readonly name: string | null;
+  readonly path: string | null;
+}
+
+/**
+ * Every `tool_use` block in an assistant event.
+ *
+ * Claude Code issues tool calls in parallel -- two `Read` calls can both be
+ * announced before either result arrives -- so callers must correlate by `id`
+ * rather than assuming a call is followed by its own result. `normalizeAssistant`
+ * deliberately yields only one event per message; this reports all of them.
+ */
+export function toolUsesIn(event: unknown): readonly ToolUse[] {
+  const record = asRecord(event);
+  if (record === null || asString(record['type']) !== 'assistant') return [];
+  const content = asArray(asRecord(record['message'])?.['content'] ?? null);
+  if (content === null) return [];
+
+  const uses: ToolUse[] = [];
+  for (const entry of content) {
+    const block = asRecord(entry);
+    if (block === null || asString(block['type']) !== 'tool_use') continue;
+    const id = asString(block['id']);
+    if (id === null) continue;
+    uses.push({ id, name: asString(block['name']), path: pathOf(block) });
+  }
+  return uses;
+}
+
+/** Every `tool_result` block in a user event, with the id it answers. */
+export function toolResultsIn(event: unknown): readonly { id: string; ok: boolean }[] {
+  const record = asRecord(event);
+  if (record === null || asString(record['type']) !== 'user') return [];
+  const content = asArray(asRecord(record['message'])?.['content'] ?? null);
+  if (content === null) return [];
+
+  const results: { id: string; ok: boolean }[] = [];
+  for (const entry of content) {
+    const block = asRecord(entry);
+    if (block === null || asString(block['type']) !== 'tool_result') continue;
+    const id = asString(block['tool_use_id']);
+    if (id === null) continue;
+    // Absent `is_error` means success -- it is omitted, not set to false.
+    results.push({ id, ok: block['is_error'] !== true });
+  }
+  return results;
+}
+
 function normalizeAssistant(event: Record<string, unknown>, now: number): AgentEvent | null {
   const message = asRecord(event['message']);
   if (message === null) return null;
@@ -92,10 +155,16 @@ function normalizeAssistant(event: Record<string, unknown>, now: number): AgentE
       if (block === null) continue;
       if (asString(block['type']) === 'tool_use') {
         const name = asString(block['name']);
+        // The file a tool is about to touch. Discarding it left
+        // `AgentResult.changedFiles` permanently empty for this adapter, which
+        // silently disabled the post-failure classification path in
+        // `TaskRunner` -- it is gated on `changedFiles.length > 0`.
+        const path = pathOf(block);
         return {
           kind: 'tool-call',
           timestamp: now,
           ...(name === null ? {} : { tool: name }),
+          ...(path === null ? {} : { path }),
           summary: name === null ? 'tool call' : `calling ${name}`,
         };
       }

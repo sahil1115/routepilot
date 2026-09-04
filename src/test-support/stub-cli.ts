@@ -120,6 +120,41 @@ export async function createStubCommand(behaviour: StubBehaviour): Promise<StubC
 }
 
 /** A plausible Claude Code stream-json transcript for a successful run. */
+/**
+ * A run Claude Code blocked on permissions.
+ *
+ * Observed verbatim against Claude Code 2.1.72 on 2026-09-03 with no
+ * `--permission-mode`: every `Edit` and `Bash` tool call comes back with
+ * `is_error: true`, the model narrates that it is being asked for permission,
+ * and the terminal event is a tidy `subtype: "success"` having changed nothing.
+ */
+export function claudePermissionBlockedTranscript(): string[] {
+  return [
+    JSON.stringify({ type: 'system', subtype: 'init', session_id: 'abc' }),
+    JSON.stringify({
+      type: 'assistant',
+      message: {
+        content: [{ type: 'tool_use', id: 'tu_1', name: 'Edit', input: { file_path: 'a.ts' } }],
+      },
+    }),
+    JSON.stringify({
+      type: 'user',
+      message: { content: [{ type: 'tool_result', tool_use_id: 'tu_1', is_error: true }] },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'The system is asking for permission.' }] },
+    }),
+    JSON.stringify({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      result: 'I identified the bug.',
+      session_id: 'abc',
+    }),
+  ];
+}
+
 export function claudeSuccessTranscript(): string[] {
   return [
     JSON.stringify({
@@ -135,11 +170,13 @@ export function claudeSuccessTranscript(): string[] {
     }),
     JSON.stringify({
       type: 'assistant',
-      message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: 'a.ts' } }] },
+      message: {
+        content: [{ type: 'tool_use', id: 'tu_1', name: 'Read', input: { file_path: 'a.ts' } }],
+      },
     }),
     JSON.stringify({
       type: 'user',
-      message: { content: [{ type: 'tool_result', is_error: false }] },
+      message: { content: [{ type: 'tool_result', tool_use_id: 'tu_1', is_error: false }] },
     }),
     JSON.stringify({
       type: 'result',

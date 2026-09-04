@@ -22,6 +22,7 @@ import type { AgentEvent, AgentExecutionRequest } from '../core/types/agent.js';
 import { makeModel } from '../test-support/fixtures.js';
 import {
   claudeFailureTranscript,
+  claudePermissionBlockedTranscript,
   claudeSuccessTranscript,
   createStubCommand,
   cursorSuccessTranscript,
@@ -227,6 +228,110 @@ describe('Claude Code adapter', () => {
     // A tool error is not evidence about the model (spec section 22).
     expect(result.failureType).toBe('TOOL_FAILURE');
     expect(result.failureType).not.toBe('MODEL_WEAKNESS');
+  });
+
+  it('does not report success when every tool call was refused', async () => {
+    // The defect this covers cost a real verification run: Claude Code cannot
+    // prompt for tool permission in print mode, so it declined every write and
+    // still emitted `subtype: "success"`. The adapter reported `completed`, and
+    // the user was told a task had succeeded that had changed nothing.
+    const cli = await stub({ stdout: claudePermissionBlockedTranscript() });
+    const adapter = new ClaudeCodeAdapter({ command: cli.command, commandArgs: cli.commandArgs });
+
+    const result = await (await adapter.execute(request({ workspaceRoot: cli.dir }), model)).result;
+
+    expect(result.status).toBe('failed');
+    // Being denied permission is a configuration problem, never evidence about
+    // the model (spec section 22). Scoring it as weakness would teach the
+    // learner to avoid a model that was never allowed to try.
+    expect(result.failureType).toBe('ENVIRONMENT_FAILURE');
+    expect(result.failureType).not.toBe('MODEL_WEAKNESS');
+    expect(result.errorSummary).toContain('permission');
+  });
+
+  it('names the permission mode that was set, when one was', async () => {
+    const cli = await stub({ stdout: claudePermissionBlockedTranscript() });
+    const adapter = new ClaudeCodeAdapter({
+      command: cli.command,
+      commandArgs: cli.commandArgs,
+      permissionMode: 'plan',
+    });
+
+    const result = await (await adapter.execute(request({ workspaceRoot: cli.dir }), model)).result;
+    expect(result.errorSummary).toContain('plan');
+  });
+
+  it('still reports success when refused calls did not stop the work', async () => {
+    // The positive control. A run that hit a refusal and went on to change
+    // files did its job, and must not be downgraded -- otherwise this guard
+    // would turn every partially-blocked success into a failure.
+    const cli = await stub({
+      stdout: [
+        JSON.stringify({ type: 'system', subtype: 'init', session_id: 'abc' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: { content: [{ type: 'tool_use', id: 'tu_1', name: 'Bash', input: {} }] },
+        }),
+        JSON.stringify({
+          type: 'user',
+          message: { content: [{ type: 'tool_result', tool_use_id: 'tu_1', is_error: true }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [{ type: 'tool_use', id: 'tu_2', name: 'Edit', input: { file_path: 'a.ts' } }],
+          },
+        }),
+        JSON.stringify({
+          type: 'user',
+          message: { content: [{ type: 'tool_result', tool_use_id: 'tu_2', is_error: false }] },
+        }),
+        JSON.stringify({ type: 'result', subtype: 'success', is_error: false, session_id: 'abc' }),
+      ],
+    });
+    const adapter = new ClaudeCodeAdapter({ command: cli.command, commandArgs: cli.commandArgs });
+
+    const result = await (await adapter.execute(request({ workspaceRoot: cli.dir }), model)).result;
+
+    expect(result.status).toBe('completed');
+    expect(result.changedFiles).toContain('a.ts');
+  });
+
+  it('correlates parallel tool calls by id, not by arrival order', async () => {
+    // Claude Code announces several tool calls before any of them answers, and
+    // the answers come back in their own order. Pairing each result with the
+    // most recent call credited a refused edit with a successful read's outcome.
+    const cli = await stub({
+      stdout: [
+        JSON.stringify({ type: 'system', subtype: 'init', session_id: 'abc' }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [
+              { type: 'tool_use', id: 'a', name: 'Edit', input: { file_path: 'blocked.ts' } },
+              { type: 'tool_use', id: 'b', name: 'Write', input: { path: 'written.ts' } },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: 'user',
+          message: {
+            content: [
+              { type: 'tool_result', tool_use_id: 'b' },
+              { type: 'tool_result', tool_use_id: 'a', is_error: true },
+            ],
+          },
+        }),
+        JSON.stringify({ type: 'result', subtype: 'success', is_error: false, session_id: 'abc' }),
+      ],
+    });
+    const adapter = new ClaudeCodeAdapter({ command: cli.command, commandArgs: cli.commandArgs });
+
+    const result = await (await adapter.execute(request({ workspaceRoot: cli.dir }), model)).result;
+
+    // `b` succeeded out of order and used the `path` key; `a` was refused.
+    expect(result.changedFiles).toEqual(['written.ts']);
+    expect(result.status).toBe('completed');
   });
 
   it('classifies a budget failure as BUDGET_EXCEEDED', async () => {

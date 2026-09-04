@@ -97,19 +97,30 @@ and does not say so.** Observed on 2026-09-04 against 2.1.72, running
 
 | task                     | result                                           |
 | ------------------------ | ------------------------------------------------ |
-| fix a failing test suite | **FAIL** — `status: completed`, source unchanged |
-| create a file            | **FAIL** — `status: completed`, file not created |
-| report on a missing file | PASS — read-only, and did not fabricate it       |
-| cancel mid-run           | PASS — reported `cancelled`                      |
+| task                     | no permission mode                               | `acceptEdits` |
+| ------------------------ | ------------------------------------------------ | ------------- |
+| fix a failing test suite | **FAIL** — refused, source unchanged             | **PASS**      |
+| create a file            | **FAIL** — refused, file not created             | **PASS**      |
+| report on a missing file | PASS — read-only, and did not fabricate it       | PASS          |
+| cancel mid-run           | PASS — reported `cancelled`                      | PASS          |
 
-Both write tasks emitted `tool-call` and `tool-result` events and then reported
-success having changed nothing. Reads work; writes are silently denied.
+**With `acceptEdits`, all four pass.** Without it, two do.
 
-That silence is the danger. A caller trusting the adapter's verdict would record
-both as successes. RoutePilot does not: validation runs afterwards, the fixture
-tests still failed, and the run reports `unverified` rather than `succeeded`.
-This is precisely the case that outcome was added for, and it is the first time
-it has caught something real.
+The cause is not ambiguous. Each `Edit` and `Bash` tool result came back with
+`is_error: true` while `Read` and `Glob` succeeded, and the model said so in
+plain text: _"The system is asking for permission to edit the file."_ Claude
+Code cannot prompt in print mode, so it declines and carries on.
+
+### The failure used to look like a success
+
+Claude Code emits a terminal `subtype: "success"` even when it was refused
+throughout, and the adapter relayed that as `status: completed`. A caller
+trusting the verdict would have recorded a task that changed nothing as done.
+
+The adapter now reports `failed` with `ENVIRONMENT_FAILURE` when tool calls were
+refused and no file changed. Not `MODEL_WEAKNESS`: the model was never permitted
+to try, and scoring it as weakness would teach the router to avoid a model on
+the strength of a configuration mistake.
 
 ### What to do about it
 
@@ -134,24 +145,31 @@ reason. Set one deliberately:
 }
 ```
 
-**Whether that fixes it is untested.** Until someone runs the fixture tasks with
-a mode set and the tests pass, neither this page nor the verification table
-claims Claude Code can edit files through RoutePilot.
+Verified on 2026-09-04 against 2.1.72: with that setting the four fixture tasks
+score 4/4, and the file-modification task's own test suite passes afterwards.
+Reproduce it from a plain terminal with:
+
+```
+npm run verify:agent-tasks -- claude-code --permission-mode acceptEdits
+```
 
 ---
 
 ## Limitations
 
-1. **Only a trivial, tool-free task has run.** The verification prompt is
-   `Reply with exactly the word OK. Do not use any tools.` It exercises the
-   transport and the event schema, not the agent doing work. File creation,
-   file modification, terminal use and test execution are all unconfirmed.
-2. **Tool permission is unaddressed** — see [Permissions](#permissions). This
-   is the limitation most likely to matter for a real coding task.
-3. **Cancellation and timeout behaviour are unconfirmed** against the real
-   tool; both are covered only by stub-process tests.
+1. **Writing requires a permission mode** — see [Permissions](#permissions).
+   This is the limitation most likely to matter for a real coding task, and
+   RoutePilot will not choose a mode on your behalf.
+2. **`changedFiles` is a lower bound.** It is built from `Edit`, `MultiEdit`,
+   `Write` and `NotebookEdit` calls whose own result came back successful,
+   correlated by tool-use id because Claude Code issues calls in parallel.
+   `Bash` can write anything and reports no path, so its writes are invisible.
+3. **Timeout behaviour is unconfirmed** against the real tool and is covered
+   only by stub-process tests. Cancellation is confirmed.
 4. **Flags are pinned to what version 2.1.72 documented.** A future version that
    renames or removes one would break the adapter, and nothing detects that
    beyond the run failing.
-5. **Nested execution is impossible to verify from inside an agent session**, so
-   confirming this adapter needs a human at a plain terminal.
+5. **Claude Code refuses to run nested inside another Claude Code session.**
+   Clearing `CLAUDECODE` and `CLAUDE_CODE_ENTRYPOINT` in the child's environment
+   lifts the refusal, which is how the 4/4 run above was obtained. A plain
+   terminal works too and needs no workaround.

@@ -73,6 +73,7 @@ const flag = (name) => {
   return at === -1 ? undefined : process.argv[at + 1];
 };
 
+const dumpEvents = process.argv.includes('--dump-events');
 const commandArgs = [];
 for (let i = 0; i < process.argv.length; i += 1) {
   if (process.argv[i] === '--command-args' && process.argv[i + 1]) {
@@ -208,9 +209,24 @@ async function execute(dir, prompt, taskType = 'bug-fix', onSession) {
   onSession?.(session);
 
   const kinds = [];
-  for await (const event of session.events) kinds.push(event.kind);
+  const events = [];
+  for await (const event of session.events) {
+    kinds.push(event.kind);
+    events.push(event);
+    if (dumpEvents) {
+      // `ok` is the field that answers "was the tool call refused, or did it
+      // succeed and change nothing" -- a distinction the event *kind* cannot
+      // carry, and one this script previously discarded.
+      const parts = [event.kind];
+      if (event.ok !== undefined) parts.push(`ok=${String(event.ok)}`);
+      if (event.tool) parts.push(`tool=${event.tool}`);
+      if (event.path) parts.push(`path=${event.path}`);
+      if (event.summary) parts.push(`summary=${String(event.summary).slice(0, 120)}`);
+      console.log(`        · ${parts.join(' ')}`);
+    }
+  }
   const result = await session.result;
-  return { result, kinds };
+  return { result, kinds, events };
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +244,7 @@ const TASKS = [
       const before = await fixtureTestsPass(dir);
       if (before) return { passed: false, detail: 'the fixture arrived already passing' };
 
-      const { result, kinds } = await execute(
+      const { result, kinds, events } = await execute(
         dir,
         'The test suite in this repository fails. Fix the bug in src/calculator.mjs ' +
           'so that `node test.mjs` passes. Run it to confirm before you finish.',
@@ -236,6 +252,7 @@ const TASKS = [
 
       const after = await fixtureTestsPass(dir);
       const source = (await read(dir, 'src/calculator.mjs')) ?? '';
+      const refused = events.filter((event) => event.kind === 'tool-result' && event.ok === false);
 
       return {
         passed: after,
@@ -243,6 +260,12 @@ const TASKS = [
           `tests ${after ? 'pass' : 'still fail'} after the run; ` +
           `status=${result.status}; ` +
           `source ${source.includes('a + b') ? 'was corrected' : 'unchanged'}; ` +
+          // The decisive number when a write task fails: a refused tool call is
+          // a permission problem, zero refusals with no change is something else.
+          `changed=[${result.changedFiles.join(', ')}]; ` +
+          (result.failureType ? `failureType=${result.failureType}; ` : '') +
+          `tool-results refused=${String(refused.length)}/` +
+          `${String(events.filter((e) => e.kind === 'tool-result').length)}; ` +
           `events=${[...new Set(kinds)].join(',') || 'none'}`,
       };
     },

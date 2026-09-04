@@ -197,18 +197,29 @@ describe('the adapter docs and the verification table cannot drift apart', () =>
     }
   });
 
-  it('records that tool permission is still unaddressed for Claude Code', async () => {
-    // This asserted the *prediction* -- "print mode cannot prompt, so a write may
-    // fail". On 2026-09-04 the fixture tasks turned it into an observation:
-    // writes are denied and the run still reports `completed`. The guard now
-    // holds the stronger claim, and holds the page to naming the modes so a
-    // reader is not left to guess which one to set.
+  it('records which permission mode was verified for Claude Code', async () => {
+    // This guard has tracked three states. It first asserted a *prediction* --
+    // print mode cannot prompt, so a write may fail. On 2026-09-04 the fixture
+    // tasks made it an observation. Later the same day `acceptEdits` was run and
+    // scored 4/4, so the page must no longer call the remedy untested; it must
+    // name the mode, and must not present `bypassPermissions` as the answer.
     const contents = await readFile(join(root, 'docs', 'CLAUDE_CODE.md'), 'utf8');
     expect(contents).toMatch(/permission-mode/);
-    expect(contents).toMatch(/cannot write files/i);
     expect(contents).toContain('acceptEdits');
     expect(contents).toContain('bypassPermissions');
-    // And to saying plainly that the remedy is untested.
-    expect(contents).toMatch(/untested/i);
+    expect(contents).toMatch(/verified on 2026-09-04/i);
+    expect(contents).not.toMatch(/whether that fixes it is untested/i);
+  });
+
+  it('does not claim Claude Code cannot be verified from an agent session', async () => {
+    // It can: clearing CLAUDECODE and CLAUDE_CODE_ENTRYPOINT lifts the nesting
+    // refusal, which is how the 4/4 run was obtained. The old wording said a
+    // human at a plain terminal was required, and that was simply wrong.
+    for (const page of ['docs/CLAUDE_CODE.md', 'src/adapters/verification.ts']) {
+      const contents = await readFile(join(root, page), 'utf8');
+      expect(contents, `${page} still claims nesting cannot be worked around`).not.toMatch(
+        /impossible to verify from inside an agent session/i,
+      );
+    }
   });
 });

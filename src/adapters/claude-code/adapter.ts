@@ -34,7 +34,13 @@ import type {
 } from '../../core/types/agent.js';
 import type { ModelSpec } from '../../core/types/model.js';
 import { probeExecutable, runProcess, type RunHandle } from '../process/runner.js';
-import { normalizeClaudeEvent, normalizeClaudeResult, parseLine } from './events.js';
+import {
+  normalizeClaudeEvent,
+  normalizeClaudeResult,
+  parseLine,
+  toolResultsIn,
+  toolUsesIn,
+} from './events.js';
 
 /** Options for {@link ClaudeCodeAdapter}. */
 export interface ClaudeCodeAdapterOptions {
@@ -77,6 +83,16 @@ const CAPABILITIES: AgentCapabilities = {
 };
 
 /** Drives Claude Code through its documented print-mode CLI. */
+/**
+ * Claude Code tools that modify a file at a known path.
+ *
+ * `Bash` is deliberately absent: it can write anything and reports no path, so
+ * treating it as a write would invent a filename, and treating its absence as
+ * proof nothing changed would be equally wrong. `changedFiles` is a lower
+ * bound, and the code that reads it treats it as one.
+ */
+const WRITING_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'Write', 'NotebookEdit']);
+
 export class ClaudeCodeAdapter implements AgentAdapter {
   readonly id = 'claude-code';
   readonly displayName = 'Claude Code';
@@ -157,6 +173,17 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     // AgentResult, so it is captured while streaming rather than re-read.
     let terminal: unknown = null;
     const changedFiles = new Set<string>();
+    // Refused tool calls are counted, not just streamed. `ok` was already
+    // extracted from `tool_result.is_error` and had no consumer, so a run that
+    // Claude Code blocked on permissions reached the caller as `completed` with
+    // nothing to say it had been prevented from doing any work.
+    let refusedToolCalls = 0;
+    // A tool call announces its path before its result says whether it was
+    // allowed, and Claude Code issues calls in parallel -- two were observed
+    // announced before either answered. So paths are held by tool-use id and
+    // committed only when that id's own result comes back successful; a refused
+    // edit must not count as a changed file.
+    const pendingWrites = new Map<string, string>();
 
     const source = async function* (this: ClaudeCodeAdapter): AsyncGenerator<AgentEvent> {
       for await (const line of handle.lines) {
@@ -165,9 +192,23 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 
         if (isResultEvent(parsed)) terminal = parsed;
 
+        // Correlation reads the raw event, not the normalised one:
+        // `normalizeClaudeEvent` yields at most one event per message and
+        // returns null for some, so counting through it would undercount.
+        for (const use of toolUsesIn(parsed)) {
+          if (use.path !== null && use.name !== null && WRITING_TOOLS.has(use.name)) {
+            pendingWrites.set(use.id, use.path);
+          }
+        }
+        for (const outcome of toolResultsIn(parsed)) {
+          if (!outcome.ok) refusedToolCalls += 1;
+          const path = pendingWrites.get(outcome.id);
+          if (outcome.ok && path !== undefined) changedFiles.add(path);
+          pendingWrites.delete(outcome.id);
+        }
+
         const event = normalizeClaudeEvent(parsed, this.#now());
         if (event === null) continue;
-        if (event.path !== undefined) changedFiles.add(event.path);
         yield event;
       }
     }.call(this);
@@ -186,7 +227,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 
       const outcome = await handle.result;
       this.#sessions.delete(sessionId);
-      return this.#toResult(outcome, terminal, [...changedFiles].sort());
+      return this.#toResult(outcome, terminal, [...changedFiles].sort(), refusedToolCalls);
     })();
 
     return Promise.resolve({
@@ -245,6 +286,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     outcome: Awaited<RunHandle['result']>,
     terminal: unknown,
     changedFiles: readonly string[],
+    refusedToolCalls: number,
   ): AgentResult {
     switch (outcome.outcome) {
       case 'cancelled':
@@ -278,7 +320,33 @@ export class ClaudeCodeAdapter implements AgentAdapter {
         break;
     }
 
-    if (terminal !== null) return normalizeClaudeResult(terminal, changedFiles);
+    if (terminal !== null) {
+      const normalized = normalizeClaudeResult(terminal, changedFiles);
+
+      // A run that finished having had every tool call refused and changed
+      // nothing did not succeed -- Claude Code cannot prompt for permission in
+      // print mode, so it reports a tidy completion having been blocked
+      // throughout. Calling that a completed run tells the user their task
+      // succeeded; calling it MODEL_WEAKNESS would blame the model for the
+      // configuration. It is an environment failure (spec section 22).
+      if (normalized.status === 'completed' && refusedToolCalls > 0 && changedFiles.length === 0) {
+        return {
+          ...normalized,
+          status: 'failed',
+          failureType: 'ENVIRONMENT_FAILURE',
+          errorSummary:
+            `Claude Code refused ${String(refusedToolCalls)} tool call(s) and changed no files. ` +
+            (this.#permissionMode === undefined
+              ? 'No --permission-mode was set, and in print mode Claude Code cannot prompt, ' +
+                'so tools that write are declined. Set agents."claude-code".permissionMode ' +
+                '(for example "acceptEdits") to allow edits.'
+              : `The permission mode "${this.#permissionMode}" did not permit the tools this ` +
+                'task needed.'),
+        };
+      }
+
+      return normalized;
+    }
 
     // Exited without a terminal event: the process failed before producing one.
     return {

@@ -8,20 +8,23 @@ what it expects to cost.
 
 > ### Status: honest about what it is
 >
-> RoutePilot **routes, and runs**. What it has not done is a task that edits
-> code.
+> RoutePilot **routes, runs, and edits code**. Both agent adapters have been
+> driven through real coding tasks and checked against the filesystem.
 >
-> - The pipeline is complete and tested — 1348 tests across 63 files, and
+> - The pipeline is complete and tested — 1353 tests across 63 files, and
 >   `npm run gate` maps every quality-gate item to the evidence for it.
 > - **Two adapters are verified against their real tools**: Claude Code 2.1.72
->   and Cursor CLI 2026.09.02 each ran a real task to completion on 2026-09-03.
->   The direct HTTP adapter remains **unverified**.
-> - **No task requiring tool use has ever run.** Both verification prompts
->   forbid tools, so file creation, file modification, terminal use and test
->   execution are unproven. This is the gap that matters most.
-> - **Claude Code is passed no `--permission-mode`**, and in print mode it
->   cannot prompt — so a task that needs to edit a file may fail rather than
->   ask. `agents` in the configuration exposes the setting; nobody has tried it.
+>   and Cursor CLI 2026.09.02. On 2026-09-04 each scored **4/4** on the same
+>   fixture suite — fixing a failing test suite, creating a file, declining to
+>   fabricate a missing one, and cancelling mid-run. Every assertion observed
+>   the filesystem or the process, never the transcript.
+> - **Claude Code needs a permission mode to write.** With none set it scores
+>   2/4: print mode cannot prompt, so every edit is declined. Set
+>   `agents."claude-code".permissionMode` to `acceptEdits`. RoutePilot passes no
+>   mode by default and will not widen your permissions for you.
+> - **The direct HTTP adapter remains unverified.** It has never been given a
+>   credential. Escalation between models has not been exercised against real
+>   agents either.
 > - **A run reports `unverified` unless your workspace declares test, build or
 >   typecheck scripts.** RoutePilot will not call a task successful on the
 >   agent's word alone.
