@@ -4,16 +4,14 @@
  * Maps the `--output-format stream-json` event stream onto RoutePilot's
  * provider-neutral {@link AgentEvent}.
  *
- * **Defensive on purpose.** The event schema here is built from the documented
- * CLI surface, not from a captured real run (see `src/adapters/verification.ts`
- * — this adapter is `unverified`). Every field is therefore treated as
- * optional and every unrecognised shape returns `null` rather than a guess. An
- * event RoutePilot does not understand is an event it ignores; it never invents
- * a `tool-call` it is not sure it saw.
+ * Defensive on purpose: every field is treated as optional and every
+ * unrecognised shape returns `null` rather than a guess. An event RoutePilot
+ * does not understand is one it ignores; it never invents a `tool-call` it is
+ * not sure it saw.
  *
  * Nothing here copies file contents or full message text into an event. Events
- * carry short summaries only, so that the core never becomes a place where
- * source code accumulates (spec section 33).
+ * carry short summaries only, so the core never becomes a place where source
+ * code accumulates (section 33).
  */
 
 import type { AgentEvent, AgentResult, TokenUsage } from '../../core/types/agent.js';

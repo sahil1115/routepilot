@@ -1,16 +1,14 @@
 /**
  * Execution monitor (spec section 21).
  *
- * Consumes the normalised {@link AgentEvent} stream an adapter produces and
- * accumulates what actually happened. It observes; it does not judge. Deciding
- * *why* a run went badly is the failure classifier's job, and deciding whether
- * to escalate is the escalation engine's (Phase 9).
+ * Consumes the normalised {@link AgentEvent} stream and accumulates what
+ * happened. It observes; it does not judge. Why a run went badly is the failure
+ * classifier's job, and whether to escalate is the escalation engine's.
  *
- * The one judgement made here is what counts as **progress**: a successful tool
+ * The one judgement made here is what counts as progress: a successful tool
  * result, a file change, or a completed terminal command. Assistant messages do
- * not count. A model narrating at length while changing nothing is exactly the
- * situation "time without progress" exists to detect, and counting its own
- * chatter as progress would blind the signal.
+ * not count -- a model narrating at length while changing nothing is exactly
+ * what "time without progress" exists to detect.
  */
 
 import { systemClock, type Clock } from '../ports.js';

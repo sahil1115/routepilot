@@ -1,16 +1,14 @@
 /**
  * `routepilot route` (spec sections 48 and 50).
  *
- * Runs the whole pipeline — classify, analyse, extract features, route — and
- * shows which model was chosen and why. It selects a model but **executes
- * nothing**: the agent adapters exist (Phase 5), but no `routepilot run`
- * command wires them to the router yet.
+ * Runs the whole pipeline -- classify, analyse, extract features, route -- and
+ * shows which model was chosen and why. It selects a model and executes
+ * nothing; `routepilot run --execute` is the command that runs one.
  *
- * On rendering: the core produces a provider-neutral `explanation` array that
- * any UI can print. In a terminal, a table beats a paragraph, so the CLI
- * renders the same facts as aligned columns and keeps the core's prose
- * available behind `--explain` (and always in `--json`) rather than printing
- * both by default.
+ * The core produces a provider-neutral `explanation` array any UI can print. In
+ * a terminal a table beats a paragraph, so the CLI renders the same facts as
+ * aligned columns and keeps the prose behind `--explain` (and always in
+ * `--json`) rather than printing both.
  */
 
 import { RoutingEngine, type RoutingDecision, type RoutingPolicy } from '../core/index.js';

@@ -149,11 +149,11 @@ export interface RunCommandOptions {
 /**
  * Run one task to a conclusion, or explain why it will not.
  *
- * The routing pass has already happened. Its decision is handed to the runner
- * to execute as-is — the runner routes nothing — which is what makes the model
- * the plan names, by construction, the model that runs. Until Phase 24 the
- * runner re-routed with a bare engine, so with learning or exploration in play
- * the plan and the execution could name different models.
+ * The routing pass has already happened, and its decision is handed to the
+ * runner to execute as-is -- the runner routes nothing. That is what makes the
+ * model the plan names, by construction, the model that runs. A runner that
+ * re-routed could name a different model than the plan once learning or
+ * exploration was in play.
  */
 export async function runTask(options: RunCommandOptions): Promise<RunCommandResult> {
   const { route, config } = options;

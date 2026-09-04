@@ -1,20 +1,18 @@
 /**
  * Safe child-process execution for agent CLIs.
  *
- * Every agent adapter that shells out goes through here, so the security and
- * lifecycle rules are implemented once:
+ * Every adapter that shells out goes through here, so the security and
+ * lifecycle rules are implemented once.
  *
- * - **No shell, ever.** `spawn` is called with an argument array and
- *   `shell: false`, so a prompt containing `;`, `&&`, backticks or quotes is
- *   passed through as a single argument and cannot inject a command
- *   (spec section 51). This matters more here than anywhere else in RoutePilot,
- *   because the prompt is arbitrary user text.
- * - **Bounded.** Every run has a timeout and a hard output cap. An agent that
- *   hangs, or floods stdout, must not take the router with it.
- * - **Cancellable.** A run can be stopped at any point, and reports that it was
- *   cancelled rather than that it failed.
- * - **Streaming.** stdout is exposed as an async iterable of lines, so events
- *   are consumed as they arrive rather than after the process exits.
+ * No shell, ever: `spawn` is called with an argument array and `shell: false`,
+ * so a prompt containing `;`, `&&`, backticks or quotes passes through as one
+ * argument and cannot inject a command (section 51). That matters most here,
+ * because the prompt is arbitrary user text.
+ *
+ * Every run is bounded by a timeout and a hard output cap, so an agent that
+ * hangs or floods stdout cannot take the router with it; cancellable, reporting
+ * cancellation rather than failure; and streaming, exposing stdout as an async
+ * iterable of lines so events arrive as they happen.
  */
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';

@@ -45,11 +45,8 @@ export interface BuildAdaptersOptions {
    */
   readonly only?: string | undefined;
   /**
-   * Per-adapter settings, keyed by adapter id.
-   *
-   * Until Phase 25 every adapter was constructed with no arguments at all, so
-   * `permissionMode` -- declared, plumbed and documented -- was never set, and
-   * `--permission-mode` never reached the CLI.
+   * Per-adapter settings, keyed by adapter id. Without these an adapter is
+   * constructed with no arguments, and `permissionMode` never reaches the CLI.
    */
   readonly agents?: Readonly<Partial<Record<string, AgentOptions>>> | undefined;
 }

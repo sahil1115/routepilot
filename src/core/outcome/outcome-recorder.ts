@@ -3,16 +3,14 @@
  *
  * Turns everything observed about a task into a `TaskSuccessScore`.
  *
- * Two rules do the real work:
+ * Only evaluated dimensions count: weights are renormalised over the dimensions
+ * actually checked, and `evidence` reports how much of the possible evidence
+ * that was. A task nobody validated scores `null`, not zero, since recording an
+ * unexamined task as a failure would poison learning.
  *
- * 1. **Only evaluated dimensions count.** Weights are renormalised over the
- *    dimensions that were actually checked, and `evidence` reports how much of
- *    the possible evidence that was. A task nobody validated scores `null`, not
- *    zero — recording an unexamined task as a failure would poison learning.
- * 2. **Cancellation is not failure.** Spec section 32 is explicit: do not treat
- *    a user pressing stop as a negative signal about the model. A cancelled
- *    task is *unevaluated*, and its outcome is excluded from anything that
- *    could update beliefs about a model.
+ * Cancellation is not failure. Section 32 is explicit that a user pressing stop
+ * is not a negative signal about the model, so a cancelled task is unevaluated
+ * and excluded from anything that could update beliefs.
  */
 
 import { isModelAttributable } from '../types/failure.js';

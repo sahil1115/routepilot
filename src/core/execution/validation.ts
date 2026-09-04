@@ -3,18 +3,15 @@
  *
  * Decides what to check after a run, and runs it.
  *
- * Two constraints shape this file:
+ * Expensive validation is avoided where it buys nothing -- a documentation edit
+ * does not need a full build -- so the plan is chosen from the task. Validation
+ * runs only after execution has finished, never against partial output, since
+ * parsing a half-written file would produce failures that say nothing about the
+ * model.
  *
- * - **Do not run expensive validation unnecessarily.** A documentation edit does
- *   not need a full build. The plan is chosen from the task, so trivial work
- *   stays cheap — the same principle as progressive repository analysis.
- * - **Validate at meaningful boundaries.** Validation runs after execution has
- *   finished, never against partial output. Parsing a half-written file as if it
- *   were source would produce failures that say nothing about the model.
- *
- * Commands are never guessed. They come from configuration, or from the
- * repository's own manifest scripts. A check with no command is reported as
- * *not run* — `passed: null` — which is distinct from passing and from failing.
+ * Commands are never guessed: they come from configuration or from the
+ * repository's own manifest scripts. A check with no command is reported as not
+ * run (`passed: null`), which is distinct from passing and from failing.
  */
 
 import type { CommandRunnerPort } from '../ports.js';

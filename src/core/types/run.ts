@@ -1,19 +1,14 @@
 /**
  * Running a task end to end (spec sections 17, 22, 27 and 31).
  *
- * Phases 5 to 14 each built one stage of a pipeline — adapters, an execution
- * monitor, a failure taxonomy, an escalation graph, an outcome model, a
- * telemetry store, a learning engine — and every one of those phases ended with
- * the same note: nothing joins them together. These are the types for the piece
- * that does.
+ * Types for the piece that joins the pipeline together -- adapters, execution
+ * monitor, failure taxonomy, escalation graph, outcome model, telemetry store
+ * and learning engine were each built separately.
  *
- * ## Why the executor is a port
- *
- * `src/core` may not import `src/adapters`, which is enforced by an
- * architectural test. That is not bureaucracy here: it is what stops the
- * orchestrator from knowing which coding agent is running, and it means the
- * whole pipeline can be driven by a scripted executor in a test without a
- * process being spawned.
+ * The executor is a port because `src/core` may not import `src/adapters`,
+ * which an architectural test enforces. That is what stops the orchestrator
+ * knowing which coding agent is running, and lets the whole pipeline be driven
+ * by a scripted executor with no process spawned.
  */
 
 import type { AgentEvent, AgentExecutionRequest, AgentResult } from './agent.js';

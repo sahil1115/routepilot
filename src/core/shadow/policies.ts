@@ -1,17 +1,15 @@
 /**
  * The built-in shadow policies (spec section 42).
  *
- * Section 42 names the comparison set directly: current, candidate,
- * cheapest-first and strongest-first. Three of those are here as standing
- * baselines; "candidate" is whatever a user configures, and is supplied rather
- * than built in.
+ * Section 42 names the comparison set: current, candidate, cheapest-first and
+ * strongest-first. Three are here as standing baselines; "candidate" is
+ * whatever a user configures.
  *
- * The two naive baselines are the point. RoutePilot's entire justification is
- * that expected-cost routing beats the obvious alternatives, and a claim like
- * that should be measured continuously rather than asserted once in a README.
- * If `cheapest-first` agrees with the live policy 98% of the time, the
- * expected-cost machinery is not earning its keep on this workload and the
- * shadow report will say so.
+ * The two naive baselines are the point. RoutePilot's justification is that
+ * expected-cost routing beats the obvious alternatives, and that should be
+ * measured continuously rather than asserted once in a README. If
+ * `cheapest-first` agrees with the live policy 98% of the time, the
+ * expected-cost machinery is not earning its keep on this workload.
  */
 
 import type { ShadowPolicySpec } from '../types/shadow.js';

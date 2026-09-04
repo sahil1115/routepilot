@@ -1,19 +1,18 @@
 /**
  * Static success prediction (spec sections 13, 14 and 35).
  *
- * Answers "how likely is this model to complete this task" using nothing but
- * configured priors. There is no learning here — learned estimates arrive in
- * Phase 12, and until enough observations exist they must not be pretended into
- * existence (spec section 35).
+ * How likely a model is to complete a task, using nothing but configured
+ * priors. No learning here: learned estimates must not be pretended into
+ * existence before enough observations exist (section 35).
  *
- * The model is deliberately simple enough to explain in one sentence:
+ * The model is deliberately explainable in one line:
  *
- *     failure probability = (1 − capability) × how demanding the task is
+ *     failure probability = (1 - capability) x how demanding the task is
  *
- * so a capable model fails rarely on easy work and more often on hard work, and
- * a weak model degrades faster as difficulty rises. That shape is what makes
- * cheap models win trivial tasks and lose hard ones without any tier being
- * hard-coded into the routing logic.
+ * so a capable model fails rarely on easy work and more often on hard work,
+ * and a weak model degrades faster as difficulty rises. That shape is what
+ * makes cheap models win trivial tasks and lose hard ones without any tier
+ * being hard-coded into routing.
  */
 
 import type { RoutingFeatures } from '../types/features.js';

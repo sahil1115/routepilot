@@ -1,18 +1,15 @@
 /**
  * Telemetry schema and migrations.
  *
- * Migrations are an ordered list, applied in sequence, tracked by SQLite's own
- * `user_version` pragma. Two properties matter:
+ * An ordered list applied in sequence, tracked by SQLite's `user_version`
+ * pragma. Migrations are forward-only and idempotent, so applying the list to a
+ * fresh database and to one at any earlier version reaches the same place; and
+ * never destructive on upgrade -- a migration may add tables, columns and
+ * indexes, but may not drop recorded history to make a schema tidier.
  *
- * - **Forward-only and idempotent.** Applying the list to a fresh database and
- *   to a database at any earlier version must reach the same place.
- * - **Never destructive on upgrade.** A migration may add tables, columns and
- *   indexes. It may not drop a user's recorded history to make a schema tidier.
- *
- * Every text column here holds either an enumerated value, a hash, or an
- * already-redacted summary. No column is intended to hold a prompt, a model
- * response, source code, or an absolute path — the record types in
- * `src/core/types/telemetry.ts` do not carry those fields in the first place.
+ * Every text column holds an enumerated value, a hash, or an already-redacted
+ * summary. None is intended to hold a prompt, a model response, source code or
+ * an absolute path, and the record types do not carry those fields at all.
  */
 
 /** One forward migration. */

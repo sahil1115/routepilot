@@ -2,15 +2,12 @@
  * Ports the core depends on for the outside world.
  *
  * The core defines these interfaces; `src/infra` implements them against Node.
- * Two reasons this indirection earns its place:
- *
- * 1. Repository analysis has a hard performance requirement — the same
- *    repository must not be rescanned unnecessarily. A port makes filesystem
- *    access *countable*, so that requirement can be asserted in a test rather
- *    than assumed.
- * 2. Diagnostics come from an editor or language server that does not exist
- *    yet. A port lets the analyzer be written and tested now, and wired to
- *    VS Code in Phase 14, without the core learning anything about VS Code.
+ * The indirection earns its place twice over. Repository analysis must not
+ * rescan the same repository unnecessarily, and a port makes filesystem access
+ * countable, so that requirement can be asserted rather than assumed. And
+ * diagnostics come from an editor or language server, so a port lets the
+ * analyzer be written and tested without the core learning anything about
+ * VS Code.
  */
 
 /** One entry in a directory listing. */

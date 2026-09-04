@@ -1,17 +1,15 @@
 /**
  * Cursor CLI event normalisation (spec section 19).
  *
- * Maps `--output-format stream-json` output onto RoutePilot's
- * provider-neutral {@link AgentEvent}, covering the categories the
- * specification names: user messages, assistant messages, tool calls, tool
- * results, file changes, terminal execution, errors, completion, cancellation.
+ * Maps `--output-format stream-json` output onto RoutePilot's provider-neutral
+ * {@link AgentEvent}, covering the categories the specification names: user and
+ * assistant messages, tool calls and results, file changes, terminal execution,
+ * errors, completion and cancellation.
  *
- * **Written from the specification, not from captured output.** `cursor-agent`
- * is not installed here, so no real event has ever been seen. Every field is
- * optional and every unrecognised shape returns `null` — the adapter ignores
- * what it does not understand rather than inventing an interpretation. The two
- * key-naming conventions in circulation (`snake_case` and `camelCase`) are both
- * accepted, since which one the tool emits has not been confirmed.
+ * Every field is optional and every unrecognised shape returns `null`, so the
+ * adapter ignores what it does not understand rather than inventing an
+ * interpretation. Both key-naming conventions in circulation (`snake_case` and
+ * `camelCase`) are accepted.
  */
 
 import type { AgentEvent, AgentResult } from '../../core/types/agent.js';

@@ -1,18 +1,14 @@
 /**
  * Decision explanation (spec section 50).
  *
- * Users must be able to trust the router, and trust requires being able to
- * check its reasoning. Every explanation therefore states the numbers the
- * decision actually turned on — including the ones for the models that were
- * *not* chosen, and the reason each excluded model was removed.
+ * Trusting the router requires being able to check its reasoning, so every
+ * explanation states the numbers the decision turned on -- including those for
+ * the models that were not chosen, and why each excluded model was removed.
  *
- * Two honesty rules apply here:
- *
- * - Probabilities are labelled as estimates from priors, because that is what
- *   they are until Phase 12 supplies observations (spec section 39).
- * - When a model's estimate came from a tier default rather than a declared
- *   prior, the explanation says so, so a precise-looking number is not read as
- *   a well-grounded one.
+ * Two honesty rules: probabilities are labelled as estimates from priors,
+ * because that is what they are until observations exist (section 39); and when
+ * an estimate came from a tier default rather than a declared prior, the
+ * explanation says so, lest a precise-looking number read as a grounded one.
  */
 
 import type { ModelEvaluation, RoutingDecision } from '../types/routing.js';

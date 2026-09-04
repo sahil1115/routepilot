@@ -1,19 +1,16 @@
 /**
  * Agent registry: selection, retry and fallback (spec sections 6 and 17).
  *
- * The router picks a *model*; this picks the *adapter* that will run it, and
- * handles the two recovery behaviours that belong at the transport level:
+ * The router picks a model; this picks the adapter that runs it, and handles
+ * the two recovery behaviours that belong at the transport level: retry, the
+ * same adapter again for transient-looking failures, bounded and with backoff;
+ * and fallback, a different adapter when this one cannot run at all.
  *
- * - **Retry** — the same adapter again, for failures that look transient.
- *   Bounded, with backoff.
- * - **Fallback** — a different adapter, when this one cannot run at all.
- *
- * Neither is escalation. Escalation changes the *model* because the model was
- * not good enough, and it lives in the escalation engine (Phase 9). Retry and
- * fallback here never change the model, and never conclude anything about it:
- * a provider outage says nothing about a model's ability, so these paths
- * classify failures as `PROVIDER_FAILURE` or `ENVIRONMENT_FAILURE` and never as
- * `MODEL_WEAKNESS` (spec section 22).
+ * Neither is escalation, which changes the model because the model was not good
+ * enough. Retry and fallback never change the model and never conclude anything
+ * about it -- a provider outage says nothing about a model's ability -- so
+ * these paths classify failures as `PROVIDER_FAILURE` or `ENVIRONMENT_FAILURE`,
+ * never `MODEL_WEAKNESS` (section 22).
  */
 
 import type {

@@ -5,16 +5,16 @@
  *
  *     cursor-agent --print --output-format stream-json --model <id> <prompt>
  *
- * Explicitly not done, and not claimed:
+ * No interception of network traffic, and no modification of the Cursor
+ * installation or its internal files.
  *
- * - No interception of Cursor's network traffic.
- * - No modification of the Cursor installation or its internal files.
+ * Verified against the real tool -- see `src/adapters/verification.ts`, which
+ * records four real coding tasks passing against Cursor CLI 2026.09.02. Event
+ * normalisation ignores shapes it does not recognise rather than guessing.
  *
- * `cursor-agent` is **not installed on this machine**, so this adapter has
- * never been run against the real tool. It is marked `unavailable` in
- * `src/adapters/verification.ts`, and its event normalisation is written from
- * the shapes the specification names rather than from captured output — so it
- * ignores anything it does not recognise instead of guessing.
+ * On Windows the installer ships no `.exe`, only a `.cmd` shim that `execFile`
+ * cannot launch without a shell; `windows-shim.ts` resolves the real
+ * executable instead.
  */
 
 import { randomUUID } from 'node:crypto';

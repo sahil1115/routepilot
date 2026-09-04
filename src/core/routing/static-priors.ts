@@ -2,15 +2,13 @@
  * Static cold-start priors (spec sections 13 and 35).
  *
  * Before any outcome has been observed, routing runs entirely on these tables.
- * They are **priors** — informed defaults, not measurements — and they are kept
- * here as data so they can be read, argued with and replaced without touching
- * the routing logic.
+ * They are priors -- informed defaults, not measurements -- kept here as data so
+ * they can be read, argued with and replaced without touching routing logic.
  *
- * Spec section 13 gives the intended shape directly: simple explanation and
- * documentation to cheap models, ordinary features and debugging to medium,
- * architecture and large migrations to frontier or above. That table is
- * reproduced here, and the router's behaviour is expected to agree with it —
- * but the router reaches its answer through expected cost to success, not by
+ * Section 13 gives the intended shape: simple explanation and documentation to
+ * cheap models, ordinary features and debugging to medium, architecture and
+ * large migrations to frontier. The router is expected to agree with that
+ * table, but reaches its answer through expected cost to success rather than by
  * reading a tier out of this file.
  */
 

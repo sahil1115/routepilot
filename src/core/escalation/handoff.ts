@@ -1,17 +1,17 @@
 /**
  * Context handoff builder (spec section 28).
  *
- * When a task moves to another model, sending only the original prompt wastes
- * everything the first attempt learned — and sending the full transcript is
- * worse: it costs money, crowds out the actual task, and re-presents the
- * previous model's dead ends as if they were progress worth continuing.
+ * Sending only the original prompt to the next model wastes what the first
+ * attempt learned; sending the full transcript is worse, because it costs
+ * money, crowds out the task, and re-presents the previous model's dead ends as
+ * progress worth continuing.
  *
  * So the handoff is a briefing: what the workspace looks like now, what was
- * already tried, what is known to be broken, and an explicit instruction not to
- * repeat failed approaches.
+ * tried, what is known to be broken, and an instruction not to repeat failed
+ * approaches.
  *
- * Nothing here copies file contents. Paths, check names and one-line summaries
- * only — the same discipline the event stream follows (spec section 33).
+ * Nothing here copies file contents -- paths, check names and one-line
+ * summaries only (section 33).
  */
 
 import type { ContextHandoff, ExecutionAttempt } from '../types/escalation.js';

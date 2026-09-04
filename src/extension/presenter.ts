@@ -1,17 +1,15 @@
 /**
  * Turning a routing result into what the editor shows (spec section 49).
  *
- * Pure. No `vscode` import, no I/O, no clock — so all of it is testable, which
- * matters because the extension host cannot be driven from this test suite and
+ * Pure -- no `vscode` import, no I/O, no clock -- so all of it is testable,
+ * which matters because the extension host cannot be driven from this suite and
  * anything living inside it would ship unverified.
  *
- * ## Redaction is applied here, not at display
- *
- * Every string these functions return can reach a tooltip, a panel, a
- * notification or an output channel. A configuration error can quote a file's
- * contents; a provider failure can quote a request header. Redacting at the
- * point of construction means a new call site in the shell cannot forget to do
- * it, and the property is testable in one place (spec sections 34 and 51).
+ * Redaction is applied here rather than at display. Every string these
+ * functions return can reach a tooltip, panel, notification or output channel,
+ * and a configuration error can quote a file's contents while a provider
+ * failure can quote a request header. Redacting at construction means a new
+ * call site in the shell cannot forget (sections 34 and 51).
  */
 
 import type { RoutingDecision } from '../core/types/routing.js';

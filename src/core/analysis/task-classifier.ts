@@ -1,16 +1,14 @@
 /**
  * Task classifier (spec section 9).
  *
- * Explicitly **not** keyword matching alone. Keywords are one signal among
- * several: the active file, the referenced files, the repository's working-tree
- * state and its diagnostics all shift the classification. A prompt saying "fix
- * this" means something different in a clean repository with no diagnostics than
- * it does in one with fourteen compiler errors.
+ * Not keyword matching alone. Keywords are one signal among several: the active
+ * file, the referenced files, the working-tree state and the diagnostics all
+ * shift the classification. "Fix this" means something different in a clean
+ * repository than in one with fourteen compiler errors.
  *
  * Scoring is deterministic and every point is attributable to a named rule, so
- * a classification can be explained rather than merely asserted (spec section
- * 50). There is no model here on purpose — spec section 36 puts learning in a
- * later stage, and an interpretable baseline is what a learned classifier will
+ * a classification can be explained rather than asserted (section 50). No model
+ * here on purpose: an interpretable baseline is what a learned classifier will
  * later have to beat.
  */
 

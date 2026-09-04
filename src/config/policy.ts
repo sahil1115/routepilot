@@ -33,12 +33,11 @@ export function toRoutingPolicy(config: RoutePilotConfig): RoutingPolicy {
 /**
  * Build the escalation limits a configuration implies (spec section 27).
  *
- * Until Phase 24 nothing converted these, so `maxEscalationsPerTask` and
- * `maxRetriesPerModel` were validated, documented and then ignored in favour of
- * the runner's built-in defaults — which happened to equal the example
- * configuration, so no test noticed. `budgets.request` is mapped to
- * `maxTotalCost`: a request budget that bounded model selection but not the
- * spend across retries and escalations was not a budget.
+ * Without this conversion `maxEscalationsPerTask` and `maxRetriesPerModel` are
+ * validated and documented but ignored in favour of the runner's defaults.
+ * `budgets.request` maps to `maxTotalCost`, because a request budget that
+ * bounded model selection but not the spend across retries and escalations
+ * would not be a budget.
  */
 export function toEscalationLimits(config: RoutePilotConfig): EscalationLimits {
   const { routing, budgets } = config;

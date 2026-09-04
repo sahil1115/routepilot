@@ -1,16 +1,13 @@
 /**
  * Configuration schema and validation (spec section 47).
  *
- * Two layers of checking happen here:
- *
- * 1. Shape validation, via schemas that reject unknown keys outright. This is
- *    what stops a credential from being pasted into a config file: any key the
- *    schema does not know about is an error, and keys that look like secrets get
- *    a specific message pointing at `auth.envVar` (spec sections 34 and 51).
- * 2. Cross-field validation, for the invariants a per-field schema cannot see —
- *    every model's provider must exist, model ids must carry their provider
- *    prefix, ids must be unique, and every price must be in the budget currency
- *    so that costs are actually comparable.
+ * Two layers. Shape validation rejects unknown keys outright, which is what
+ * stops a credential being pasted into a config file -- keys that look like
+ * secrets get a message pointing at `auth.envVar` (sections 34 and 51).
+ * Cross-field validation covers the invariants a per-field schema cannot see:
+ * every model's provider must exist, model ids must carry their provider
+ * prefix, ids must be unique, and every price must be in the budget currency so
+ * costs are comparable.
  *
  * Every failure is reported with a path and, where a concrete fix exists, a
  * hint. Validation collects all problems rather than stopping at the first.

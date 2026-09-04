@@ -1,20 +1,18 @@
 /**
  * Selection rules (spec section 42).
  *
- * A routing policy is two things: the limits a candidate must satisfy, and the
- * rule for choosing among those that do. The limits live in `RoutingPolicy` and
- * are applied by the constraint engine; this file holds the rules.
+ * A routing policy is the limits a candidate must satisfy plus the rule for
+ * choosing among those that do. The limits live in `RoutingPolicy`; this file
+ * holds the rules.
  *
- * `expected-cost` is what production uses. The other two are **baselines**, and
- * they earn their place by being the obvious alternatives a sceptic would
- * propose: if RoutePilot cannot beat "always use the cheap model" or "always use
- * the best model", the whole expected-cost apparatus is unjustified complexity
- * and the shadow report should say so.
+ * `expected-cost` is what production uses. The other two are baselines, and
+ * they earn their place as the obvious alternatives a sceptic would propose: if
+ * RoutePilot cannot beat "always use the cheap model" or "always use the best
+ * model", the expected-cost apparatus is unjustified complexity.
  *
- * Every rule chooses only among **viable** candidates. A rule that ignored the
- * budget or the confidence threshold would produce shadow decisions RoutePilot
- * would never be allowed to execute, which makes the comparison meaningless and
- * the reported saving imaginary.
+ * Every rule chooses only among viable candidates. One that ignored the budget
+ * or the confidence threshold would produce shadow decisions RoutePilot could
+ * never execute, making the comparison meaningless.
  */
 
 import type { ModelEvaluation } from '../types/routing.js';
