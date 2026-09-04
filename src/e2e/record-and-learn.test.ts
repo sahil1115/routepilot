@@ -1,20 +1,15 @@
 /**
  * The closing of the loop (spec section 75).
  *
- * Section 75 ends with two steps that had never happened:
- *
- *   After completion: record models used, execution path, actual cost, latency,
- *   validation result, failure types, escalation, user outcome.
- *   Later: learn from the result.
- *
- * Every record *type* has existed since Phase 8 and the learning layer since
- * Phase 10, but nothing produced a record from a real run — the store was
- * written to only by its own tests, and the learning layer had never seen an
- * observation it did not synthesise. These tests hold the loop closed.
+ * Section 75 ends with two steps: record what a completed task did -- models
+ * used, execution path, actual cost, latency, validation result, failure types,
+ * escalation, user outcome -- and later learn from it. The record types and the
+ * learning layer both predate any producer, so these tests hold the loop
+ * closed.
  *
  * They use a real SQLite store in a temporary directory, because the point is
- * that a run reaches the database. A fake store would prove the call was made,
- * which is the less interesting half.
+ * that a run reaches the database. A fake store would prove only that the call
+ * was made.
  */
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';

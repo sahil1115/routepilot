@@ -1,26 +1,23 @@
 /**
  * Finding the Cursor CLI on Windows.
  *
- * The installer puts `cursor-agent.cmd` and `cursor-agent.ps1` on PATH and no
- * `.exe` at all. Node's `execFile` cannot launch a `.cmd` without a shell —
- * it returns `EINVAL` — and `docs/SECURITY.md` forbids `shell: true`, because a
- * shell re-parses arguments and this project spawns processes with values that
- * came from a user's prompt.
+ * The installer puts `cursor-agent.cmd` and `.ps1` on PATH and no `.exe`.
+ * Node's `execFile` cannot launch a `.cmd` without a shell (it returns
+ * `EINVAL`), and `docs/SECURITY.md` forbids `shell: true`, since a shell
+ * re-parses arguments and this project spawns processes with values from a
+ * user's prompt. So the adapter's default cannot work on Windows at all.
  *
- * So the adapter's default of `cursor-agent` cannot work on Windows at all.
- * Measured on 2026-09-03 against Cursor CLI 2026.09.02-c22c1a3:
+ * Measured against Cursor CLI 2026.09.02-c22c1a3:
  *
  *     cursor-agent.cmd   (what the installer puts on PATH)  -> EINVAL
  *     node.exe index.js  (what the shim ultimately runs)    -> 2026.09.02-c22c1a3
  *
- * The `.cmd` runs the `.ps1`, and the `.ps1` runs
- * `<version>\node.exe <version>\index.js`. Both of those are real files that
- * `execFile` can spawn, so this resolves them directly and reaches the same CLI
- * by a route the security policy allows.
+ * The `.cmd` runs the `.ps1`, which runs the versioned `node.exe` on the
+ * versioned `index.js` -- both real files `execFile` can spawn. Resolving them directly reaches the
+ * same CLI by a route the security policy allows.
  *
- * This is a workaround for a packaging decision on one platform, and it is
- * confined to this file so that it stays visible as one. If Cursor ships a real
- * executable, delete this.
+ * A workaround for a packaging decision on one platform, confined here so it
+ * stays visible as one. If Cursor ships a real executable, delete this.
  */
 
 import { existsSync, readdirSync, statSync } from 'node:fs';

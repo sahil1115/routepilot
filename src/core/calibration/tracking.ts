@@ -1,25 +1,19 @@
 /**
  * Confidence tracking: pairing what was predicted with what happened.
  *
- * Calibration cannot be measured from summary statistics — a reliability
- * diagram needs the individual `(predicted, actual)` pairs. This module turns a
- * routing decision plus its outcome into exactly those pairs.
+ * A reliability diagram needs individual `(predicted, actual)` pairs, not
+ * summary statistics. This turns a routing decision plus its outcome into them.
  *
- * ## Only the selected model is scored
+ * Only the selected model is scored. A decision evaluates every candidate but
+ * ran one; the others have a prediction and no outcome, and there is no honest
+ * way to supply one -- assuming they would have failed manufactures evidence,
+ * and assuming they would have succeeded manufactures different evidence.
+ * Counterfactual scoring is shadow routing, with its own machinery (section 43).
  *
- * A decision evaluates every candidate, but only one was run. The others have a
- * prediction and **no outcome**, and there is no honest way to supply one:
- * assuming the unrun candidates would have failed would manufacture evidence,
- * and assuming they would have succeeded would manufacture different evidence.
- * Counterfactual scoring of unrun candidates is shadow routing, which is
- * Phase 13's job and needs its own machinery (spec section 43).
- *
- * This leaves a real bias in the data, and it is worth naming: the predictions
- * that get scored are the ones the router was confident enough to act on, so
- * calibration is measured over a **selected sample**, not a random one
- * (spec section 44). It is still the right sample to measure — those are the
- * predictions that spent money — but it is not a measure of the predictor's
- * accuracy across all tasks, and nothing here should be read as one.
+ * That leaves a real bias worth naming: the scored predictions are the ones the
+ * router was confident enough to act on, so calibration is measured over a
+ * selected sample (section 44). It is the right sample -- those are the
+ * predictions that spent money -- but it is not accuracy across all tasks.
  */
 
 import type { PredictionRecord, PredictionSource } from '../types/calibration.js';

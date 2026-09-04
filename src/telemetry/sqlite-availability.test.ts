@@ -3,14 +3,12 @@
  *
  * `node:sqlite` arrived in Node 22.5. RoutePilot declares `engines.node >=20.11`
  * because everything except telemetry works below that, and the VS Code
- * extension host shipped Node 20 through VS Code 1.95 — so "the module is not
- * there" is a state real users will be in, not a hypothetical.
+ * extension host shipped Node 20 through VS Code 1.95 -- so a missing module is
+ * a state real users will be in.
  *
- * A review claimed this crashes the CLI and the extension host. It does not:
- * `openTelemetryStore` already wrapped the import in a try/catch. But nothing
- * exercised that path, so it was true by accident rather than by test, and the
- * message a user would have seen was "No such built-in module: node:sqlite",
- * which names neither the cause nor the remedy.
+ * `openTelemetryStore` already wrapped the import in a try/catch, but nothing
+ * exercised that path, so it held by accident rather than by test, and the
+ * message a user saw named neither cause nor remedy.
  *
  * These tests hold both properties: the run continues, and the reason is
  * legible. The loader is injected because the failure cannot otherwise be

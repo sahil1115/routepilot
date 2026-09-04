@@ -1,25 +1,20 @@
 /**
  * Editor-facing view models (spec section 49).
  *
- * The VS Code extension is a **thin layer over the CLI's operations**, and this
- * is where the thinking part of it lives. Everything here is pure: no `vscode`
- * import, no I/O, no clock. The extension shell binds these shapes to widgets
+ * The thinking part of the VS Code extension. Everything here is pure: no
+ * `vscode` import, no I/O, no clock. The shell binds these shapes to widgets
  * and does nothing else.
  *
  * That split is not tidiness. An extension host cannot be driven from a test
- * runner here, so any logic living inside it would ship unverified. Keeping the
+ * runner here, so logic living inside it would ship unverified; keeping the
  * shell to wiring makes the untested surface small enough to describe honestly
- * (spec section 2, rule 20).
+ * (rule 20).
  *
- * ## Two rules everything in this file obeys
- *
- * 1. **Nothing user-facing may carry a secret.** Every string that can reach a
- *    tooltip, a panel or an output channel is redacted at construction, not at
- *    display, so a new call site cannot forget (spec sections 34 and 51).
- * 2. **Nothing here blocks.** These are values computed from a result that has
- *    already arrived. Analysis must never block the UI, so the work that takes
- *    time happens behind a cancellable request and this layer only renders what
- *    came back.
+ * Two rules hold throughout. Nothing user-facing may carry a secret -- every
+ * string that can reach a tooltip, panel or output channel is redacted at
+ * construction rather than at display, so a new call site cannot forget
+ * (sections 34 and 51). And nothing here blocks: these are values computed from
+ * a result that has already arrived.
  */
 
 import type { ModelTier } from '../core/types/model.js';

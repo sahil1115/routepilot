@@ -1,22 +1,19 @@
 /**
  * Learning test fixtures: a synthetic world with known ground truth.
  *
- * The acceptance criterion for Phase 10 is that a learned policy **improves
- * routing on a deterministic synthetic dataset**. That demands three things
- * this file provides:
+ * A learned policy must be shown to improve routing on a deterministic
+ * synthetic dataset, which needs three things.
  *
- * 1. **Priors that are wrong in a specific, measurable way.** Two models are
- *    configured with misleading priors — one overrated, one underrated — so
- *    that static routing provably picks the worse model. If the priors were
- *    right, learning could not improve anything and the test would prove
- *    nothing.
- * 2. **Ground truth to score against.** Each model has a true success rate that
- *    the configuration does not know. "Improvement" is measured against these
- *    rates, not against the router's own opinion — otherwise the router would
- *    be grading its own homework.
- * 3. **Determinism.** Outcomes come from a fixed repeating pattern, never a
- *    random number generator. The same dataset produces byte-identical
- *    statistics on every run, on every machine.
+ * Priors that are wrong in a measurable way: two models are configured
+ * misleadingly, one overrated and one underrated, so static routing provably
+ * picks the worse model. Right priors would leave learning nothing to improve.
+ *
+ * Ground truth to score against: each model has a true success rate the
+ * configuration does not know, so improvement is measured against those rates
+ * rather than the router's own opinion.
+ *
+ * Determinism: outcomes follow a fixed repeating pattern, never a random number
+ * generator.
  *
  * Excluded from the published build (see tsconfig.build.json).
  */

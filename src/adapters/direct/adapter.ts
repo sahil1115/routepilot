@@ -1,23 +1,18 @@
 /**
  * Generic direct-provider adapter (spec section 20).
  *
- * The specification asks for a direct provider abstraction "where practical",
- * so that the core is never coupled to one vendor. The practical boundary is
- * this: **transport is genuinely generic; request and response shapes are not.**
- * Every provider encodes messages, streams deltas and reports usage
- * differently, and writing a "generic" encoder would mean inventing an API that
- * no provider implements.
+ * Transport is genuinely generic; request and response shapes are not. Every
+ * provider encodes messages, streams deltas and reports usage differently, so a
+ * "generic" encoder would mean inventing an API no provider implements.
  *
- * So this ships the half that is real:
- *
- * - endpoint, authentication, timeout and retry, all from configuration;
- * - streaming over HTTP with cancellation;
- * - credential handling that keeps the secret out of every log line, error
- *   message and thrown object (spec sections 20, 34 and 51).
+ * This ships the half that is real: endpoint, authentication, timeout and retry
+ * from configuration; streaming over HTTP with cancellation; and credential
+ * handling that keeps the secret out of every log line, error message and
+ * thrown object (sections 20, 34 and 51).
  *
  * The vendor-specific half is a {@link ProviderProtocol} supplied by the
- * caller. No concrete protocol ships yet — see `src/adapters/verification.ts`,
- * where this adapter is recorded as `unverified` with that limitation stated.
+ * caller. No concrete protocol ships yet, and `verification.ts` records this
+ * adapter as unverified for that reason.
  */
 
 import type {

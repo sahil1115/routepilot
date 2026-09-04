@@ -1,23 +1,19 @@
 /**
  * Claude Code adapter (spec section 18).
  *
- * Integrates through Claude Code's **documented, supported** non-interactive
- * CLI surface and nothing else:
+ * Integrates through Claude Code's documented non-interactive CLI surface and
+ * nothing else:
  *
  *     claude -p <prompt> --output-format stream-json --verbose --model <id>
  *
- * Explicitly not done, and not claimed:
+ * No interception of network traffic, no modification of the installation, no
+ * undocumented flags or files. The specification asks for a local gateway where
+ * the environment supports one and says plainly not to invent one otherwise.
  *
- * - No interception of Claude Code's network traffic.
- * - No modification of Claude Code's installation or internals.
- * - No reliance on undocumented flags or files.
- *
- * The specification asks for a local gateway where the environment supports
- * one, and says plainly: if it does not, do not invent one — implement the
- * supported wrapper and document the limitation. That is what this is. What has
- * and has not been confirmed against the real CLI is recorded in
- * `src/adapters/verification.ts` -- verified on 2026-09-03 for a trivial,
- * tool-free task, and unverified for anything that needs tool permission.
+ * What has been confirmed against the real CLI is recorded in
+ * `src/adapters/verification.ts`. In short: four real coding tasks pass with
+ * `permissionMode` set to `acceptEdits`, and two of the four fail without it,
+ * because print mode cannot prompt for tool permission.
  */
 
 import { randomUUID } from 'node:crypto';

@@ -1,24 +1,20 @@
 /**
  * The VS Code shell (spec section 49).
  *
- * Deliberately thin. Every decision about *what* to show lives in
- * `src/extension/` in the main package, where it is pure and covered by the
- * test suite; this file binds those values to widgets and does nothing else.
+ * Deliberately thin. Every decision about what to show lives in
+ * `src/extension/` in the main package, where it is pure and covered by tests;
+ * this file binds those values to widgets.
  *
- * The reason is not architectural taste. The extension host cannot be driven
- * from RoutePilot's test runner, so anything implemented here ships unverified.
- * Keeping it to wiring makes the untested surface small enough to state plainly
- * (spec section 2, rule 20) — see `docs/EXTENSION.md`.
+ * The reason is not taste: the extension host cannot be driven from RoutePilot's
+ * test runner, so anything implemented here ships unverified. Keeping it to
+ * wiring makes the untested surface small enough to state plainly (rule 20) --
+ * see `docs/EXTENSION.md`.
  *
- * ## Two properties this file is responsible for
- *
- * 1. **The UI never blocks.** Routing runs inside `withProgress` with a
- *    cancellation token that is honoured at every await point. Analysis is
- *    already async throughout the core; what this file must not do is await it
- *    outside a cancellable scope.
- * 2. **Nothing logged or shown carries a secret.** Every string reaching the
- *    output channel or a notification comes from the presenter, which redacts
- *    at construction. This file adds no strings of its own beyond fixed text.
+ * Two properties are this file's responsibility. The UI never blocks: routing
+ * runs inside `withProgress` with a cancellation token honoured at every await
+ * point. And nothing logged or shown carries a secret -- every string reaching
+ * the output channel or a notification comes from the presenter, which redacts
+ * at construction.
  */
 
 import * as vscode from 'vscode';

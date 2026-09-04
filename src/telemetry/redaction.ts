@@ -3,22 +3,18 @@
  *
  * Everything written to the telemetry store passes through here first.
  *
- * The design assumption is that redaction *will* be needed — error messages
- * echo request headers, stack traces embed connection strings, and shell output
- * prints environment variables. So this is not a last line of defence; it is
- * the normal path, applied at the single point where data crosses into
- * persistence, so no caller has to remember.
+ * Redaction is assumed to be needed, not exceptional: error messages echo
+ * request headers, stack traces embed connection strings, shell output prints
+ * environment variables. So this is the normal path, applied at the single
+ * point where data crosses into persistence, and no caller has to remember.
  *
- * Two layers:
+ * Two layers. Structural: whole categories are never stored -- source code,
+ * full model responses, absolute paths, `.env` contents -- and fields that
+ * could carry them are not written at all rather than written then scrubbed.
+ * Textual: what is stored is scrubbed for credential shapes.
  *
- * 1. **Structural.** Whole categories are simply never stored: source code,
- *    full model responses, absolute paths, `.env` contents. Fields that could
- *    carry them are not written at all rather than written-then-scrubbed.
- * 2. **Textual.** What is stored — short summaries, error messages — is scrubbed
- *    for credential shapes.
- *
- * Redaction is lossy on purpose. When in doubt, drop it: a missing telemetry
- * field costs a little learning signal, a leaked key costs far more.
+ * Lossy on purpose. When in doubt, drop it: a missing telemetry field costs a
+ * little learning signal, a leaked key costs far more.
  */
 
 /** Credential-shaped patterns, replaced wherever they appear. */

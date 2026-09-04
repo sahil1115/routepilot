@@ -1,23 +1,17 @@
 /**
  * Struggle score (spec section 23).
  *
- * Answers "how badly is this run going?" from multiple weighted signals —
- * explicitly **not** a single threshold, because any one signal is ambiguous.
- * Two consecutive tool failures might be a wrong path or a flaky filesystem;
- * five minutes of silence might be deep work or a stuck loop. Only the
- * combination is informative.
+ * How badly a run is going, from several weighted signals rather than one
+ * threshold, because any single signal is ambiguous: two tool failures might be
+ * a wrong path or a flaky filesystem, five minutes of silence might be deep
+ * work or a stuck loop. Only the combination is informative.
  *
- * The score is reported twice, and the split is the point:
- *
- * - `score` — how badly the run is going, whatever the cause. Useful for a
- *   progress UI and for deciding to stop.
- * - `modelAttributableScore` — how much of that implicates the *model*. This is
- *   the only number escalation and learning may use.
- *
- * Spec section 23 states the rule plainly: an environment or provider failure
- * must not increase the model-weakness score. A database being down is not
- * evidence that a model is weak, and letting it look like evidence would poison
- * every later routing decision (spec section 38).
+ * Reported twice, and the split is the point. `score` is how badly the run is
+ * going whatever the cause, useful for progress and for deciding to stop.
+ * `modelAttributableScore` is how much of that implicates the model, and is the
+ * only number escalation and learning may use -- an environment or provider
+ * failure must not raise it, or it would poison every later decision
+ * (sections 23 and 38).
  */
 
 import type {

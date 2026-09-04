@@ -5,18 +5,18 @@
  * `npm run verify:extension` drives the extension against `fake-vscode.cjs`,
  * which proves the shell behaves given a `vscode` object. It cannot prove the
  * manifest is accepted, that activation succeeds, that the contributed command
- * ids are the ones actually registered, or that an ESM core loads inside a
- * CommonJS extension host. Every one of those fails only in the real thing.
+ * ids are the ones registered, or that an ESM core loads inside a CommonJS
+ * extension host -- each of which fails only in the real thing.
  *
- * This launches the VS Code already installed on this machine — not a
- * downloaded one — with `--extensionDevelopmentPath` pointed at `extension/`
- * and `--extensionTestsPath` at `extension/test/host-suite.cjs`.
+ * This launches the VS Code already installed on this machine, with
+ * `--extensionDevelopmentPath` pointed at `extension/` and
+ * `--extensionTestsPath` at `extension/test/host-suite.cjs`.
  *
  * Run with `npm run verify:vscode`. Exit code 0 means the extension works in a
- * real host, on this machine, at the VS Code version printed in the output.
+ * real host at the VS Code version printed in the output.
  *
- * It opens a VS Code window. That is unavoidable — an extension host is an
- * editor — and it closes itself when the suite finishes.
+ * It opens a VS Code window -- an extension host is an editor -- and closes it
+ * when the suite finishes.
  */
 
 import { existsSync, readFileSync, rmSync } from 'node:fs';

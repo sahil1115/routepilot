@@ -5,17 +5,16 @@
  *
  * 1. Apply the hard filter. An impossible model can never be selected.
  * 2. Honour an explicit model request, unless it is impossible.
- * 3. Score every survivor: success probability, risk, latency, and expected
- *    total cost to success.
- * 4. Keep only those meeting the policy's threshold, risk cap, latency cap and
- *    budget.
- * 5. Choose the **cheapest expected path to success** among them — not the
- *    cheapest first attempt.
+ * 3. Score every survivor: success probability, risk, latency, expected total
+ *    cost to success.
+ * 4. Keep those meeting the policy's threshold, risk cap, latency cap and budget.
+ * 5. Choose the cheapest expected path to success -- not the cheapest first
+ *    attempt.
  * 6. If nothing qualifies, follow the configured behaviour. Never silently
- *    exceed a budget, and never silently pick something below the threshold.
+ *    exceed a budget or pick something below the threshold.
  *
- * **Determinism is a hard requirement.** No clock, no randomness, no iteration
- * over unordered structures. The same inputs always produce byte-identical
+ * Determinism is a hard requirement: no clock, no randomness, no iteration over
+ * unordered structures. The same inputs always produce byte-identical
  * decisions, including the order of every list in the result.
  */
 

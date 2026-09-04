@@ -56,22 +56,16 @@ export interface AdapterVerification {
 /**
  * The verification table.
  *
- * `claude-code` is verified: on 2026-09-03 it executed a real task against
- * Claude Haiku 4.5 through Claude Code 2.1.72 and returned `completed`. That is
- * the first and so far only adapter to have run against a real model.
+ * "Verified" means a real task ran end to end. `claude-code` and `cursor-cli`
+ * both are, and as of 2026-09-04 both have also been driven through four real
+ * coding tasks against a throwaway fixture repository, every assertion made
+ * against the filesystem rather than the transcript. Claude Code passes all
+ * four only when a permission mode is set; see its limitations.
  *
- * `cursor-cli` is verified too, on the same day and to the same narrow extent.
- *
- * `direct-provider` is not: it has never been given a credential. It is
- * implemented against a documented surface and covered by tests that drive real
- * child processes — which proves it handles the shapes it was told to expect,
- * not that those are the shapes the tool emits.
- *
- * "Verified" here means a real task ran end to end. As of 2026-09-04 both
- * verified adapters have also been driven through four real coding tasks
- * against a throwaway fixture repository, with every assertion made against the
- * filesystem rather than the transcript. Claude Code passes all four only when
- * a permission mode is set; see its limitations.
+ * `direct-provider` is not verified: it has never been given a credential. It
+ * is covered by tests that drive real child processes, which proves it handles
+ * the shapes it was told to expect, not that those are the shapes the tool
+ * emits.
  */
 export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   {

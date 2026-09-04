@@ -2,20 +2,15 @@
  * `routepilot shadow` (spec sections 42 and 44).
  *
  * Reports how often alternative policies would have routed differently, and
- * which models they preferred when they did.
+ * which models they preferred.
  *
- * ## The thing this report must never imply
+ * A negative cost figure is not money left on the table. Every shadow decision
+ * names a model that was never executed, and both sides come from the same
+ * success probabilities, so a miscalibrated predictor moves them together and
+ * the difference carries the error rather than exposing it.
  *
- * A negative cost figure is **not money that was left on the table**. Every
- * shadow decision names a model that was never executed, so there is no outcome
- * for it, and both sides of the comparison come from the same success
- * probabilities — a miscalibrated predictor moves them together and the
- * difference carries the error rather than exposing it.
- *
- * The report therefore never uses the word "saving", labels the figure as an
- * estimate wherever it appears, and states the limitation in full at the
- * bottom. Establishing that one policy is actually better needs outcomes for
- * both arms, which is offline policy evaluation (Phase 13).
+ * The report therefore never says "saving", labels the figure an estimate
+ * wherever it appears, and states the limitation in full at the bottom.
  */
 
 import type { ShadowAgreement, ShadowRecord } from '../core/types/shadow.js';

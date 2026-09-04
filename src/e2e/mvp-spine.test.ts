@@ -3,26 +3,15 @@
  *
  *   TASK -> ROUTING -> MODEL -> EXECUTION -> MONITORING -> ESCALATION -> OUTCOME
  *
- * Section 73 says the MVP must prove that arrow first, and must not *begin*
- * with complex ML, contextual bandits, multi-model ensembles, cloud analytics,
- * distributed infrastructure, team dashboards, complicated AST indexing, or a
- * full dependency graph for every repository.
+ * Section 73 says the MVP must prove that arrow first, and must not begin with
+ * complex ML, contextual bandits, ensembles, cloud analytics, distributed
+ * infrastructure, dashboards, AST indexing, or a full dependency graph.
  *
- * RoutePilot arrived at that instruction with most of the "later phases"
- * already built — learning in Phase 10, calibration in 11, shadow routing in
- * 12, a contextual bandit in 13. So the question this file answers is not "were
- * they built too early", which cannot be un-answered now. It is the question
- * that still has consequences:
- *
- *   **Does the spine still work when every one of them is switched off?**
- *
- * If it does, the advanced machinery is an addition to a working core rather
- * than load-bearing. If it does not, the core was never small, whatever the
- * roadmap says. Principles 16 and 17 make the same demand — the system must
- * still work if learning is disabled, and if telemetry is disabled.
- *
- * Nothing here is stubbed except the coding agent and the shell, the two edges
- * RoutePilot does not own.
+ * Most of those were built early here, so the question these tests answer is
+ * the one that still has consequences: does the spine still work when every one
+ * of them is switched off? If it does, the advanced machinery is an addition to
+ * a working core rather than load-bearing. Principles 16 and 17 make the same
+ * demand of learning and telemetry.
  */
 
 import { readFile } from 'node:fs/promises';

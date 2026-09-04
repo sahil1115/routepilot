@@ -4,20 +4,14 @@
  * Pure: builds the Markdown a participant would stream back. The shell binds it
  * to the editor's chat API and adds nothing.
  *
- * ## What this participant is, and what it deliberately is not
+ * It explains routing -- which model it would choose for a task, the estimated
+ * cost, and why. It does not answer coding questions and must not look as
+ * though it might: choosing which agent does the work is the product, and a
+ * participant that appeared to try and then failed would be worse than one that
+ * never offered. So an unrecognised request gets a short capability list rather
+ * than a best effort.
  *
- * It **explains routing**. Ask it about a task and it says which model it would
- * choose, what that is estimated to cost, and why.
- *
- * It does **not** answer coding questions, and it must not look as though it
- * might. RoutePilot's job is to choose which agent should do the work; a chat
- * participant that started doing the work itself would be a different product,
- * and one that appeared to try and then failed would be worse than one that
- * never offered. So an unrecognised request gets a short, honest capability
- * list rather than a best effort.
- *
- * Nothing here executes a model. The reply describes a routing decision, in the
- * same sense that `routepilot route` does.
+ * Nothing here executes a model.
  */
 
 import type { RoutingDecision } from '../core/types/routing.js';

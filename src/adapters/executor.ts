@@ -2,22 +2,19 @@
  * The executor the task runner drives (spec sections 17 and 20).
  *
  * Implements the core's `ExecutorPort` over the agent registry, so the runner
- * gets retry, adapter fallback and provider substitution without knowing that
- * any of them exist.
+ * gets retry, adapter fallback and provider substitution without knowing any of
+ * them exist.
  *
- * ## Why this exists rather than the runner calling the registry
+ * It exists rather than the runner calling the registry because `src/core` may
+ * not import `src/adapters` -- an architectural test fails the build if it
+ * does. That boundary keeps the orchestrator ignorant of which coding agent is
+ * installed, and lets the whole pipeline run under a scripted executor with no
+ * process spawned.
  *
- * `src/core` may not import `src/adapters` — an architectural test fails the
- * build if it does. That boundary is what keeps the orchestrator ignorant of
- * which coding agent is installed, and it is what lets the whole pipeline be
- * driven by a scripted executor in a test with no process spawned.
- *
- * ## Events
- *
- * `AgentRegistry.execute` returns a result and discards the event stream. The
- * execution monitor needs those events — struggle detection and much of the
- * failure taxonomy are built on them — so this collects them as they arrive.
- * An executor that dropped them would silently disable half of Phase 6.
+ * `AgentRegistry.execute` returns a result and discards the event stream, but
+ * the execution monitor needs those events -- struggle detection and much of
+ * the failure taxonomy are built on them -- so this collects them as they
+ * arrive.
  */
 
 import type { AgentEvent, AgentExecutionRequest } from '../core/types/agent.js';

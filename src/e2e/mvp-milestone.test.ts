@@ -1,20 +1,17 @@
 /**
  * The MVP milestone (spec section 74).
  *
- * Fourteen capabilities the first working milestone must support. Each is
- * checked against the thing that implements it rather than against a claim that
- * it exists, in the same spirit as `scripts/quality-gate.mjs`: a checklist
- * ticked by hand is a statement about a moment, and this one has to survive
- * refactoring.
+ * Fourteen capabilities the first working milestone must support, each checked
+ * against the thing that implements it rather than a claim that it exists. A
+ * checklist ticked by hand is a statement about a moment; this one has to
+ * survive refactoring.
  *
- * The single item that had been outstanding since Phase 5 is item 8, "one real
- * agent adapter". What was missing was never the adapter — it was a production
- * caller. `routepilot run` is that caller, and this file is the proof it joins
- * every other item on the list.
+ * Item 8, "one real agent adapter", was outstanding longest. What was missing
+ * was never the adapter but a production caller, and `routepilot run` is it.
  *
- * What this file does **not** claim: that any adapter has been verified against
- * its real tool. Availability is probed; execution never has been. That
- * distinction is the subject of its own test below rather than a footnote.
+ * This file does not itself verify an adapter against its real tool. It asserts
+ * that whatever `verification.ts` claims is backed by evidence; the runs that
+ * produce that evidence live in `scripts/verify-agent-tasks.mjs`.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -188,17 +185,14 @@ describe('section 74 milestone — the fourteen capabilities', () => {
   });
 
   it('14. complete automated tests: nothing claims to be verified that is not', () => {
-    // The honesty invariant the whole milestone rests on. Every adapter is
-    // still `unverified`, and this asserts that the table says so rather than
-    // that verification has happened.
+    // The honesty invariant the milestone rests on: a status of `verified`
+    // must be backed by evidence, and anything else must say how to verify it.
     const real = ADAPTER_VERIFICATION.filter((entry) => entry.adapterId !== 'fake');
     expect(real.length).toBeGreaterThan(0);
 
     for (const entry of real) {
       if (entry.status === 'verified') {
-        // If one is ever genuinely verified, it must carry evidence. This
-        // branch is deliberately not dead code — it is what stops the status
-        // being flipped without proof.
+        // What stops a status being flipped without proof.
         expect(entry.evidence).toBeTruthy();
       } else {
         expect(entry.howToVerify).toBeTruthy();

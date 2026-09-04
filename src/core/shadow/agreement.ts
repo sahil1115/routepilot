@@ -1,24 +1,18 @@
 /**
  * Aggregating recorded shadow decisions (spec sections 42 and 44).
  *
- * Turns a history of `(current chose A, shadow would have chosen B)` records
- * into the per-policy summary a user actually reads.
+ * Turns a history of `(current chose A, shadow would have chosen B)` into the
+ * per-policy summary a user reads.
  *
- * ## What the summed cost delta is, precisely
+ * The summed cost delta is the total estimated difference under the estimates
+ * current when each decision was made. It is not money saved and not evidence
+ * that the shadow policy is better: the shadow's model never ran, and both
+ * sides come from the same success probabilities, so a miscalibrated predictor
+ * moves them together and the difference inherits the error.
  *
- * It is the total estimated difference **under the estimates that were current
- * at the time each decision was made**. It is not money saved, not money that
- * would have been saved, and not evidence that the shadow policy is better.
- *
- * The reason is structural rather than a matter of sample size: the shadow's
- * model was never executed, so no outcome exists for it. Both sides of every
- * delta come from the same success probabilities, so a miscalibrated predictor
- * moves them together and the difference inherits the error. Running the shadow
- * policy for real could produce a completely different figure.
- *
- * Only decisions where **both** policies selected something contribute, and
- * `comparableCount` reports how many that was, so a delta summed over three
- * comparable decisions cannot be mistaken for one summed over three hundred.
+ * Only decisions where both policies selected something contribute, and
+ * `comparableCount` reports how many, so a delta over three comparable
+ * decisions cannot be mistaken for one over three hundred.
  */
 
 import type { ShadowAgreement, ShadowRecord } from '../types/shadow.js';

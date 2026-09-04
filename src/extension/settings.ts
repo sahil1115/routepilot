@@ -1,25 +1,18 @@
 /**
- * VS Code settings, and what they are allowed to change (spec section 49).
+ * VS Code settings, and what they may change (spec section 49).
  *
- * Pure: takes whatever the editor read out of `settings.json` and produces
- * validated overrides. The shell passes values in; nothing here touches the
- * editor.
+ * Pure: takes what the editor read out of `settings.json` and produces
+ * validated overrides. Nothing here touches the editor.
  *
- * ## Settings narrow, they never widen
- *
- * A workspace `.vscode/settings.json` is a file in a repository. It can arrive
- * through a clone, a branch, or a pull request from someone the user has never
- * met, and VS Code applies it without ceremony. So the editor is allowed to
- * make RoutePilot *more* careful and never less:
- *
- * - A budget may be lowered, never raised above the configured limit.
- * - A confidence threshold may be raised, never lowered.
- * - Exploration may be switched off, never on.
- * - The operation mode may be made stricter, never relaxed.
+ * Settings narrow, never widen. A workspace `.vscode/settings.json` can arrive
+ * through a clone, a branch or a pull request from someone the user has never
+ * met, and VS Code applies it without ceremony. So the editor may make
+ * RoutePilot more careful and never less: a budget may be lowered but not
+ * raised, a confidence threshold raised but not lowered, exploration switched
+ * off but not on, the operation mode made stricter but not relaxed.
  *
  * Without that asymmetry, opening an untrusted repository would be enough to
- * turn on experiments and remove a spending cap, which is precisely the shape
- * of problem spec section 40 exists to prevent.
+ * turn on experiments and remove a spending cap.
  */
 
 import type { OperationMode } from '../core/bandit/exploration-gate.js';

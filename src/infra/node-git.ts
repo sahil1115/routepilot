@@ -1,21 +1,19 @@
 /**
  * Node implementation of {@link GitPort}.
  *
- * Security note (spec section 51): every invocation uses `execFile` with an
- * argument **array** and `shell: false`. No command string is ever assembled,
- * so a repository path containing shell metacharacters cannot inject anything.
- * Argument lists are constant — only the working directory varies, and it is
- * passed as `cwd`, never interpolated.
+ * Security (spec section 51): every invocation uses `execFile` with an argument
+ * array and `shell: false`. No command string is assembled, so a repository
+ * path containing shell metacharacters cannot inject anything. Argument lists
+ * are constant; only the working directory varies, passed as `cwd`.
  *
- * Scoping note: the analyzed root is frequently *not* the repository root. A
- * package inside a monorepo is the obvious case; a far nastier one is a
- * developer who has run `git init` in their home directory, which silently
- * makes every temporary directory part of a repository containing the entire
- * user profile. Both are handled the same way: status and diff are restricted
- * to the analyzed subtree with a `-- .` pathspec, and the paths git reports
- * (which are always relative to the repository root) are rebased onto the
+ * The analyzed root is frequently not the repository root -- a package inside a
+ * monorepo, or a developer who ran `git init` in their home directory, which
+ * silently makes every temporary directory part of a repository containing the
+ * whole user profile. Both are handled the same way: status and diff are
+ * restricted to the analyzed subtree with a `-- .` pathspec, and the paths git
+ * reports (always relative to the repository root) are rebased onto the
  * analyzed root. Without this, analysing a small folder can walk an enormous
- * tree and report changes that have nothing to do with the task.
+ * tree and report unrelated changes.
  */
 
 import { execFile } from 'node:child_process';

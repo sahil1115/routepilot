@@ -1,26 +1,18 @@
 /**
  * Config to agent registry (spec section 74, item 8).
  *
- * The one place that turns a configuration into the concrete adapters a run
- * will use, mirroring what `src/config/registries.ts` does for models and
- * providers. Until this existed, `AgentRegistry` and `RegistryExecutor` had no
- * production caller at all: the whole execution half of RoutePilot was
- * reachable only from tests.
- *
- * ## Availability is asked, never assumed
+ * Turns a configuration into the concrete adapters a run will use, mirroring
+ * what `src/config/registries.ts` does for models and providers.
  *
  * `build` probes each adapter with `getStatus()` and reports what it found.
- * Nothing is filtered out silently — an unavailable adapter is returned with
- * the reason it is unavailable, so the CLI can print actionable guidance
- * instead of "no adapter" (spec section 19).
+ * Nothing is filtered out silently -- an unavailable adapter comes back with
+ * the reason, so the CLI can print actionable guidance rather than "no adapter"
+ * (spec section 19).
  *
- * ## This does not make an adapter verified
- *
- * Availability means the binary answered a version probe. It does not mean a
- * task has ever been executed through it. The verification table in
- * `src/adapters/verification.ts` remains the authority on that, and it is
- * deliberately not consulted here — this module reports facts, and the CLI
- * decides what to allow.
+ * Availability is not verification: it means the binary answered a version
+ * probe, not that a task has ever run through it. `verification.ts` remains the
+ * authority there and is deliberately not consulted here -- this module reports
+ * facts, and the CLI decides what to allow.
  */
 
 import type { AgentAdapter, AgentStatus } from '../core/types/agent.js';
