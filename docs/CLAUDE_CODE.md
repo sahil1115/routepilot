@@ -91,23 +91,52 @@ stores them.
 
 ## Permissions
 
-**RoutePilot passes no `--permission-mode`.** The adapter accepts one and never
-sets it: `buildAdapters` constructs `new ClaudeCodeAdapter()` with no options,
-and no configuration surface exposes it.
+**With no `--permission-mode`, Claude Code cannot write files in print mode —
+and does not say so.** Observed on 2026-09-04 against 2.1.72, running
+`npm run verify:agent-tasks -- claude-code`:
 
-That matters more than it sounds. In `--print` mode Claude Code cannot prompt
-for tool permission, so a task that needs to edit a file may fail rather than
-ask. The verification task forbids tools entirely, which is exactly why it
-cannot tell you whether real coding tasks work.
+| task                     | result                                           |
+| ------------------------ | ------------------------------------------------ |
+| fix a failing test suite | **FAIL** — `status: completed`, source unchanged |
+| create a file            | **FAIL** — `status: completed`, file not created |
+| report on a missing file | PASS — read-only, and did not fabricate it       |
+| cancel mid-run           | PASS — reported `cancelled`                      |
 
-The fix is not to pass a permissive mode by default — RoutePilot does not weaken
-a user's permission settings on their behalf. It is to expose the option and let
-a user choose. Until a file-editing task has run against the real tool, neither
-this page nor the verification table will claim it works.
+Both write tasks emitted `tool-call` and `tool-result` events and then reported
+success having changed nothing. Reads work; writes are silently denied.
 
-No `--max-budget-usd` or `--max-turns` is passed either. RoutePilot's own cost
-cap applies _between_ attempts, so a single runaway attempt is bounded only by
-the adapter's 30-minute timeout.
+That silence is the danger. A caller trusting the adapter's verdict would record
+both as successes. RoutePilot does not: validation runs afterwards, the fixture
+tests still failed, and the run reports `unverified` rather than `succeeded`.
+This is precisely the case that outcome was added for, and it is the first time
+it has caught something real.
+
+### What to do about it
+
+The adapter passes no permission mode by default and will not start doing so.
+RoutePilot does not widen a user's permissions on their behalf, and the modes
+are not equivalent:
+
+| mode                         | scope                                |
+| ---------------------------- | ------------------------------------ |
+| `acceptEdits`                | accepts file edits without prompting |
+| `bypassPermissions`          | grants everything                    |
+| `plan`                       | forbids edits entirely               |
+| `default`, `dontAsk`, `auto` | the tool's own behaviours            |
+
+Only `acceptEdits` is scoped to the thing being asked for. `bypassPermissions`
+is the counterpart of Cursor's `--yolo`, which this project refuses for the same
+reason. Set one deliberately:
+
+```jsonc
+"agents": {
+  "claude-code": { "permissionMode": "acceptEdits" }
+}
+```
+
+**Whether that fixes it is untested.** Until someone runs the fixture tasks with
+a mode set and the tests pass, neither this page nor the verification table
+claims Claude Code can edit files through RoutePilot.
 
 ---
 

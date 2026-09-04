@@ -18,7 +18,9 @@
         "maxDelayMs": 30000
       },
       "availability": "available",
-      "tags": ["example"]
+      "tags": [
+        "example"
+      ]
     }
   ],
   "models": [
@@ -64,7 +66,9 @@
           "python": 0.72
         }
       },
-      "tags": ["example"]
+      "tags": [
+        "example"
+      ]
     },
     {
       "id": "anthropic/sonnet-5",
@@ -109,7 +113,9 @@
           "python": 0.86
         }
       },
-      "tags": ["example"]
+      "tags": [
+        "example"
+      ]
     },
     {
       "id": "anthropic/opus-5",
@@ -154,7 +160,9 @@
           "python": 0.93
         }
       },
-      "tags": ["example"]
+      "tags": [
+        "example"
+      ]
     },
     {
       "id": "anthropic/fable-5",
@@ -203,7 +211,9 @@
         "requiresExplicitOptIn": true,
         "notes": "Highest cost tier. Opted into deliberately, never selected by accident."
       },
-      "tags": ["example"]
+      "tags": [
+        "example"
+      ]
     }
   ],
   "routing": {
@@ -222,6 +232,10 @@
     "daily": 25.0,
     "monthly": 300.0,
     "onExceeded": "ask"
+  },
+  "agents": {
+    "claude-code": {},
+    "cursor-cli": {}
   },
   "learning": {
     "enabled": false,

@@ -97,13 +97,24 @@ export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
       'CONFIRMED against the real tool: availability detection, version parsing, ' +
         'process spawning, the stream-json event schema, event normalisation through to a ' +
         'terminal `completed`, and usage reporting.',
-      'NOT CONFIRMED: cancellation, timeout behaviour, failure classification from real ' +
-        'errors, and any task that requires tool use. The verification prompt is ' +
-        'deliberately trivial and forbids tools, so it exercises the transport and the ' +
-        'event schema rather than the agent doing real work.',
-      'Tool permission is unaddressed: the adapter passes no `permissionMode`, and in ' +
-        'print mode Claude Code cannot prompt. A task that needs to edit files may ' +
-        'therefore still fail, and that has not been tried.',
+      'CONFIRMED with real work: reading files, tool use, and cancellation mid-run. ' +
+        'Four real coding tasks were run on 2026-09-04 against 2.1.72 with no permission ' +
+        'mode passed; the two read-only ones passed.',
+      'DISCONFIRMED, and this is the important one: with no `--permission-mode`, ' +
+        'Claude Code CANNOT WRITE FILES in print mode, and does not say so. Asked to fix ' +
+        'a failing test it emitted tool-call and tool-result events, reported ' +
+        '`status: completed`, and changed nothing; asked to create a file it did the ' +
+        'same. A caller trusting that verdict would record both as ' +
+        'successes. RoutePilot does not, because validation runs afterwards and the ' +
+        'fixture tests still failed -- which is exactly the case the Phase 25 ' +
+        '`unverified` outcome exists for.',
+      'Whether a permission mode fixes this is UNTESTED. 2.1.72 offers acceptEdits, ' +
+        'bypassPermissions, default, dontAsk, plan and auto; only `acceptEdits` is scoped ' +
+        'to edits, and `bypassPermissions` grants everything and should not be a default. ' +
+        'Set one under `agents.claude-code.permissionMode` and re-run ' +
+        '`npm run verify:agent-tasks -- claude-code` from a plain terminal.',
+      'NOT CONFIRMED: timeout behaviour, and failure classification from real provider ' +
+        'errors.',
       'Claude Code refuses to run nested inside another Claude Code session, so execution ' +
         'cannot be verified from an agent session — it must be run from a plain terminal.',
       'The argument list is built from flags read from `claude --help` on version 2.1.72: ' +
