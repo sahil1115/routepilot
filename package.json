@@ -52,7 +52,8 @@
     "bench": "npm run build && node bench/benchmark.mjs",
     "phase": "node scripts/phase-check.mjs",
     "gate": "node scripts/quality-gate.mjs",
-    "verify:vscode": "npm run build:extension && node scripts/run-vscode-tests.mjs"
+    "verify:vscode": "npm run build:extension && node scripts/run-vscode-tests.mjs",
+    "verify:agent-tasks": "npm run build && node scripts/verify-agent-tasks.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

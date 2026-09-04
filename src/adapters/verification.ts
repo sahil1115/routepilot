@@ -126,19 +126,27 @@ export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
       date: '2026-09-03',
       toolVersion: '2026.09.02',
       note:
-        'Ran a trivial task end to end against Cursor CLI 2026.09.02-c22c1a3 on Windows, ' +
-        'Node 22.18.0. Result: completed in 33167 ms with no failure type. Observed event ' +
-        'kinds in order: user-message, assistant-message, completed. Recorded from the ' +
-        'machine-written report at .routepilot/adapter-verification-cursor-cli.json.',
+        'Ran real coding tasks end to end against Cursor CLI 2026.09.02 on Windows, ' +
+        'Node 22.18.0, with no permission mode passed. Four tasks, each checked by ' +
+        'inspecting the workspace afterwards rather than by reading the transcript: ' +
+        'fixed a failing test suite so `node test.mjs` passes (60 s, tool-call events ' +
+        'observed); created a new file with the requested export (27 s); asked for a ' +
+        'non-existent file and did not fabricate it (19 s); cancelled mid-run and ' +
+        'reported `cancelled` (3 s). Recorded from the machine-written reports at ' +
+        '.routepilot/agent-tasks-cursor-cli.json and adapter-verification-cursor-cli.json.',
     },
     limitations: [
       'CONFIRMED against the real tool: availability detection, version parsing, Windows ' +
         'shim resolution, process spawning, the stream-json event schema, event ' +
         'normalisation through to a terminal `completed`, and workspace-trust handling.',
-      'NOT CONFIRMED: usage reporting — the real run returned no usage at all, so cost ' +
+      'CONFIRMED with real work: file modification, file creation, tool use, running ' +
+        'the workspace test suite, and cancellation mid-run. Checked by inspecting the ' +
+        'workspace, not by trusting the transcript.',
+      'NOT CONFIRMED: usage reporting — the real runs returned no usage at all, so cost ' +
         'for a Cursor run is priced from estimates rather than measurement. Also ' +
-        'unconfirmed: cancellation, timeouts, failure classification from real errors, ' +
-        'and any task requiring tool use.',
+        'unconfirmed: timeout behaviour, failure classification from real provider ' +
+        'errors, and escalation, which is a runner decision across two models rather ' +
+        'than an adapter behaviour.',
       'On Windows the installer provides only `cursor-agent.cmd` and `.ps1`, which ' +
         '`execFile` cannot launch without a shell. The adapter resolves the `node.exe` and ' +
         '`index.js` those wrap; see `windows-shim.ts`. Without that it cannot run on ' +
