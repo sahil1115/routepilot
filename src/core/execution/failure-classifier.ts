@@ -1,26 +1,18 @@
 /**
  * Failure classification (spec section 22).
  *
- * This is the most consequential piece of judgement in RoutePilot. Every
- * downstream behaviour depends on getting it right:
+ * The most consequential judgement in RoutePilot. Escalation reads it to decide
+ * whether a stronger model would help or whether more context, a retry or a
+ * question is the answer (section 26); learning reads it to decide whether an
+ * outcome says anything about a model at all (sections 22 and 38).
  *
- * - Escalation reads it to decide whether a *stronger model* would help, or
- *   whether more context, a retry, or a question to the user is the answer
- *   (spec section 26).
- * - Learning reads it to decide whether an outcome says anything about a
- *   model's ability at all (spec sections 22 and 38).
- *
- * Two rules govern the design:
- *
- * 1. **Environmental causes win.** Checks run in order of how conclusively they
- *    explain the failure. If a test failed because the database was unreachable,
- *    that is `ENVIRONMENT_FAILURE` and the enquiry stops there — the spec calls
- *    this out by name.
- * 2. **`MODEL_WEAKNESS` requires positive evidence and is never a default.** It
- *    is the only classification that updates beliefs about a model, so it must
- *    be earned: repeated model-caused failures, edit churn, or validation the
- *    model's own changes broke. Anything unexplained is `UNKNOWN`, which is
- *    honest and harmless.
+ * Two rules. Environmental causes win: checks run in order of how conclusively
+ * they explain the failure, so a test that failed because the database was
+ * unreachable is `ENVIRONMENT_FAILURE` and the enquiry stops. And
+ * `MODEL_WEAKNESS` requires positive evidence and is never a default -- it is
+ * the only classification that updates beliefs about a model, so it must be
+ * earned by repeated model-caused failures, edit churn, or validation the
+ * model's own changes broke. Anything unexplained is `UNKNOWN`.
  */
 
 import type { FailureType } from '../types/failure.js';

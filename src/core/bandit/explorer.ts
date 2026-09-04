@@ -1,60 +1,35 @@
 /**
  * The contextual bandit (spec sections 36 and 40).
  *
- * Chooses between **exploiting** — taking the model with the lowest expected
- * cost to success — and **exploring** — deliberately taking a different one to
- * find out whether it is better than currently believed.
+ * Chooses between exploiting -- the model with the lowest expected cost to
+ * success -- and exploring, deliberately taking another to learn whether it is
+ * better than currently believed.
  *
- * ## The objective is still expected cost, not success probability
- *
- * A textbook bandit maximises reward, which here would be success probability,
- * and that would be the wrong thing to optimise: it would explore the most
- * expensive model on every task, since a frontier model is always plausibly the
- * most likely to succeed. RoutePilot's objective has been expected cost to
- * success since Phase 9, and exploration uses the same objective with an
- * optimistic probability substituted in:
+ * The objective stays expected cost, not success probability. Maximising
+ * probability would explore the most expensive model every time, since a
+ * frontier model is always plausibly the most likely to succeed. Exploration
+ * uses the same objective with an optimistic probability substituted in:
  *
  * ```
  * optimisticCost(m) = expectedCostToSuccess( initial(m), UCB(p(m)) )
  * ```
  *
- * **Every candidate is scored optimistically, including the exploiting one**,
- * and the lowest optimistic cost wins. The symmetry is essential and was not
- * obvious: an earlier version compared each alternative's *optimistic* cost
- * against the exploit choice's *expected* cost, which sounds reasonable and
- * starves the chosen arm. Whichever model was currently preferred received no
- * benefit of the doubt, so some alternative always looked plausibly better, so
- * the preferred arm was never run again and its estimate froze. The simulation
- * caught it: one arm sat at five observations for three hundred rounds while
- * the other was "explored" every single time.
+ * Every candidate is scored optimistically, including the exploiting one, and
+ * the lowest optimistic cost wins. The symmetry matters: comparing an
+ * alternative's optimistic cost against the exploit choice's expected cost
+ * starves the chosen arm, which then never runs again and freezes its estimate.
  *
- * Scoring everything the same way does the work instead:
+ * Scoring everything alike means a model that cannot win even at its most
+ * flattering is never tried, expensive models are rare targets because optimism
+ * must overcome their price, and bounds tighten with evidence so exploration is
+ * self-limiting rather than a permanent tax.
  *
- * - A model that cannot win even at its most flattering is never tried, however
- *   uncertain it is. Uncertainty alone is not a reason to spend money.
- * - Expensive models are naturally rare exploration targets, because their
- *   price has to be overcome by the optimism, not merely accompanied by it.
- * - As observations accumulate a bound tightens onto its mean, so a
- *   well-understood arm competes on its merits and a barely-tried one keeps its
- *   benefit of the doubt until it has earned or lost it. Exploration is
- *   self-limiting rather than a permanent tax.
+ * Only viable candidates are considered -- exploration widens which acceptable
+ * model is chosen, never what counts as acceptable. An experiment may cost at
+ * most `maxCostPremium` more than exploiting and must still fit the budget;
+ * risk and hazards are handled earlier by {@link assessExploration}.
  *
- * ## Budget-aware and risk-aware by construction
- *
- * Budget: an experiment may cost at most `maxCostPremium` more than exploiting,
- * and must still fit the request budget. Risk and hazards are handled before
- * any of this, by {@link assessExploration}.
- *
- * Only **viable** candidates are ever considered — a model that fails the
- * confidence threshold, the risk cap, the latency cap or the budget is not an
- * exploration target. Exploration widens *which* acceptable model is chosen; it
- * never lowers the bar for what counts as acceptable.
- *
- * ## Determinism
- *
- * No sampling and no randomness. Given the same statistics the same candidate
- * is chosen every time, which keeps the Phase 3 determinism requirement intact
- * and satisfies architectural principle 9.
+ * No sampling and no randomness, so routing stays deterministic (principle 9).
  */
 
 import { DEFAULT_RECOVERY_MODEL, expectedCostToSuccess } from '../routing/expected-cost.js';

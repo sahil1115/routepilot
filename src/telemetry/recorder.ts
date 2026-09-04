@@ -1,26 +1,19 @@
 /**
  * Recording a completed run (spec section 75).
  *
- * Section 75 ends with a list of what must be recorded after a task finishes:
- * models used, execution path, actual cost, latency, validation result, failure
- * types, escalation, user outcome. Every one of those record *types* has
- * existed since Phase 8 — what did not exist was anything that produced them
- * from a real run. The store was written to only by its own tests.
+ * Produces the records section 75 requires -- models used, execution path,
+ * actual cost, latency, validation result, failure types, escalation, user
+ * outcome -- from a real run. The record types already existed; nothing
+ * produced them, and the store was written to only by its own tests.
  *
- * This is the producer. It is the last link in the loop section 75 describes:
- * route, execute, monitor, classify, escalate, **record**, and later learn.
- *
- * ## What is deliberately not recorded
- *
- * The prompt, the diff, the model's output, file contents, credentials. A
- * prompt contributes its length and a stable hash — enough to notice the same
- * request twice, not enough to reconstruct what it said. A workspace
+ * Deliberately not recorded: the prompt, the diff, model output, file contents,
+ * credentials. A prompt contributes its length and a stable hash, enough to
+ * notice the same request twice but not to reconstruct it; a workspace
  * contributes a hash, so repositories can be grouped but not located. Error
- * summaries pass through {@link redactSummary}. Nothing else that a task
- * produced reaches the database at all.
+ * summaries pass through {@link redactSummary}.
  *
- * That is the privacy contract from `docs/PRIVACY.md`, enforced here because
- * this is the only place a real task reaches the database.
+ * That is the privacy contract in `docs/PRIVACY.md`, enforced here because this
+ * is the only place a real task reaches the database.
  */
 
 import type { RunResult } from '../core/types/run.js';

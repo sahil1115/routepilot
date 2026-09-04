@@ -1,9 +1,8 @@
 /**
  * The expected-cost-to-success model (spec sections 1, 14 and 15).
  *
- * This is RoutePilot's central claim expressed as arithmetic, isolated as a
- * pure function so it can be reasoned about and tested without a registry, a
- * model or a task:
+ * RoutePilot's central claim as arithmetic, isolated as a pure function so it
+ * can be tested without a registry, a model or a task:
  *
  * ```
  * expectedTotal(m) = initial(m) + P(fail | m) x recovery(m)
@@ -14,33 +13,22 @@
  * escalation(m)    = expectedTotal(next) x (1 + handoffOverhead)
  * ```
  *
- * ## When cheapest-initial is not cheapest-expected
- *
- * Worth stating precisely, because the answer is not "always" and pretending
- * otherwise would be marketing rather than engineering.
- *
- * Take two models, A cheaper up front than B, with B the escalation target and
- * nothing beyond it. Writing `f` for a failure probability, the condition for A
- * to be the *dearer* path is:
+ * Cheapest-initial is not always cheapest-expected. For two models A and B with
+ * B the escalation target, A is the dearer path when:
  *
  * ```
  * initialA x (1 + retryShare x fA) + escalationShare x (1+overhead) x fA x expectedTotalB
  *     >  expectedTotalB
  * ```
  *
- * With the defaults below and a small `fA`, that requires `initialA` to be a
- * large fraction of `initialB` — roughly 85-90%. In other words:
+ * With the defaults below and a small `fA` that needs `initialA` to be roughly
+ * 85-90% of `initialB`. So when a cheap model is much cheaper, opening with it
+ * is genuinely cheaper even at a poor success rate; when two models are close in
+ * price and differ in reliability, the cheaper sticker price is a trap.
  *
- * - When a cheap model is **much** cheaper, trying it first genuinely is the
- *   cheaper expected path even at a poor success rate. The arithmetic is right,
- *   and the router opening with it is correct.
- * - When two models are **close in price** and differ in reliability, the
- *   dearer, more reliable one wins on expected cost — and the cheaper sticker
- *   price is a trap.
- *
- * The first case is why `minimumSuccessProbability` exists as a *separate*
- * constraint: expected dollars alone would always gamble, and dollars are not
- * the only cost of a failure. The second case is what this file is for.
+ * The first case is why `minimumSuccessProbability` is a separate constraint:
+ * expected dollars alone would always gamble, and dollars are not the only cost
+ * of a failure.
  */
 
 /** Inputs to the expected-cost calculation. */

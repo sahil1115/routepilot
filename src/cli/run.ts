@@ -1,33 +1,20 @@
 /**
  * `routepilot run` (spec section 74).
  *
- * The command that joins the MVP spine end to end:
+ * Joins the MVP spine end to end:
  *
  *   TASK -> ROUTING -> MODEL -> EXECUTION -> MONITORING -> ESCALATION -> OUTCOME
  *
- * Everything below `route` already existed and was reachable only from tests.
- * This is the production caller.
+ * Plans by default and executes only when told. `run` hands a coding agent
+ * write access to a workspace, so a mistyped command must not be able to start
+ * an agent editing a repository. The default prints the whole routing pass, the
+ * adapter that would be used, the budget and the spending ceiling, and runs
+ * nothing; `--execute` is the deliberate act.
  *
- * ## Why it plans by default and executes only when told
- *
- * `run` hands a coding agent write access to a workspace. **No adapter has ever
- * been verified against its real tool**, so an accidental invocation is a real
- * risk rather than a theoretical one: a mistyped command should not be able to
- * start an agent editing a repository.
- *
- * So the default is a plan — the whole routing pass, the adapter that would be
- * used, the budget, the ceiling on spend — with nothing executed. `--execute`
- * is the deliberate act. This costs one flag and removes a class of accident
- * that cannot be undone, and it is the same reasoning that keeps exploration
- * off in production mode.
- *
- * ## What it will refuse to do
- *
- * - execute with no adapter available (with the adapter's own setup guidance)
- * - execute a decision the router declined to make
- * - execute the very agent it is running inside
- * - exceed the request budget without either refusing or saying so
- * - commit anything, ever (principle 13)
+ * It refuses to execute with no adapter available (reporting the adapter's own
+ * setup guidance), to execute a decision the router declined to make, to
+ * execute the agent it is running inside, to exceed the request budget without
+ * refusing or saying so, and to commit anything, ever (principle 13).
  */
 
 import { readFile } from 'node:fs/promises';

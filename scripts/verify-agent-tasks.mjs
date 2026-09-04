@@ -2,31 +2,27 @@
 /**
  * Verify an adapter against real coding tasks.
  *
- * `verify-adapter.mjs` sends one prompt — "Reply with exactly the word OK. Do
- * not use any tools." — and asserts the run reached `completed`. That proves
- * the transport and the event schema. It cannot prove an agent driven through
- * this adapter can do work, because it explicitly forbids the agent from
- * trying.
+ * `verify-adapter.mjs` sends one prompt and asserts the run reached
+ * `completed`, which proves the transport and event schema but forbids the
+ * agent from doing anything.
  *
- * This asks for work, in a throwaway repository, and checks the **filesystem**
- * afterwards. Every assertion here is an observation: a file exists, its
- * contents changed, the fixture's own test suite passes. Nothing is taken from
- * the agent's transcript, because a transcript is the agent's account of what
- * it did and the whole question is whether that account is true.
+ * This asks for work in a throwaway repository and checks the filesystem
+ * afterwards. Every assertion is an observation -- a file exists, its contents
+ * changed, the fixture's own test suite passes -- never the agent's transcript,
+ * since the whole question is whether that account is true.
  *
  * Usage:
  *   node scripts/verify-agent-tasks.mjs cursor-cli
- *   node scripts/verify-agent-tasks.mjs claude-code
  *   node scripts/verify-agent-tasks.mjs claude-code --permission-mode acceptEdits
  *
  *   --command <path>          explicit path to the CLI
  *   --command-args <arg>      argument placed before the adapter's own; repeatable
  *   --permission-mode <mode>  passed through to the adapter
  *   --only <task>             run one task by name
+ *   --dump-events             print each event, including whether tools were refused
  *
- * This spends real quota and lets a real agent write files. Everything it can
- * touch is a fresh directory under the system temp directory containing four
- * files worth nothing. Your repository is never the workspace.
+ * This spends real quota and lets a real agent write files, all of them in a
+ * fresh temp directory worth nothing. Your repository is never the workspace.
  *
  * Exit code 0 means every task it ran was observed to work.
  */

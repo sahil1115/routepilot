@@ -1,28 +1,25 @@
 /**
  * Escalation engine (spec sections 24, 26 and 27).
  *
- * Decides what to do after a failed attempt. The governing idea, stated in the
- * specification and worth repeating here: **escalation is a graph, not a
- * ladder.** `cheap -> medium -> expensive` is the wrong default, because most
- * failures are not "the model was too weak":
+ * Decides what to do after a failed attempt. Escalation is a graph, not a
+ * ladder: `cheap -> medium -> expensive` is the wrong default, because most
+ * failures are not "the model was too weak".
  *
  * | Why it failed | What actually helps |
  * | --- | --- |
  * | The provider was down | Retry, or another provider |
  * | The database was down | Retry once the environment is fixed |
- * | The test was flaky | Retry — never a stronger model |
+ * | The test was flaky | Retry -- never a stronger model |
  * | The request was ambiguous | Ask the user |
  * | The context overflowed | A bigger window, not a cleverer model |
  * | The user cancelled | Stop |
- * | The model kept getting it wrong | *Now* a stronger model |
+ * | The model kept getting it wrong | Now a stronger model |
  *
- * Escalating on any of the first six would spend more money reproducing the
- * same failure. So the failure classification drives the decision, and only
- * `MODEL_WEAKNESS` — the single classification that may implicate a model —
+ * Escalating on any of the first six spends more money reproducing the same
+ * failure, so classification drives the decision and only `MODEL_WEAKNESS`
  * leads to a vertical escalation.
  *
- * Limits are checked before anything else, so a task can never loop forever
- * (spec section 27).
+ * Limits are checked first, so a task can never loop forever (section 27).
  */
 
 import { PRIMARY_SKILL_BY_TASK, tierRank } from '../routing/static-priors.js';

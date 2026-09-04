@@ -2,40 +2,21 @@
  * Shadow routing (spec sections 42, 43 and 44).
  *
  * Evaluates alternative policies alongside the live one and records what they
- * would have chosen. **No shadow policy ever executes anything.**
+ * would have chosen. No shadow policy ever executes anything.
  *
- * ## Why this class cannot execute a model, structurally
+ * That guarantee is structural rather than a rule to remember. This class is
+ * built from a registry and a learned model, neither of which can start a
+ * process or reach a provider; `src/core` may not import `src/adapters` at all,
+ * which an architectural test enforces; and a {@link ShadowOutcome} carries a
+ * model id, not a session, so there is nothing to await.
  *
- * The guarantee is not a rule someone has to remember. It is a consequence of
- * what this class is able to reach:
- *
- * - It is constructed from a {@link ModelRegistry} and a
- *   {@link LearnedSuccessModel}. Neither can start a process, open a socket, or
- *   reach a provider — a `ModelSpec` is a description of a model, not a handle
- *   to one.
- * - No adapter is reachable from `src/core` at all: the architectural guard in
- *   `vendor-neutrality.test.ts` fails the build if any core file imports from
- *   `src/adapters`.
- * - A {@link ShadowOutcome} carries a model **id**. There is no session, no
- *   promise, and nothing to await.
- *
- * The result is that "shadow policies must not execute additional models" holds
- * because there is no code path from here to an execution, not because the code
- * politely declines to take one.
- *
- * ## Cost, and the claim it does not support
- *
- * Every shadow decision comes with an estimated cost difference, and it would
- * be easy — and wrong — to read a negative number as money saved. The shadow's
- * model never ran, so there is no outcome for it, and the estimate on both
- * sides comes from the same success probabilities. A miscalibrated predictor
- * shifts current and shadow together, so the delta preserves the error instead
- * of exposing it.
- *
- * What a shadow comparison genuinely supports is narrower and still useful:
- * *these policies disagree this often, and here is which model the alternative
- * prefers.* Turning that into a claim about which policy is better needs
- * outcomes for both arms, which is offline policy evaluation (Phase 13).
+ * Each shadow decision carries an estimated cost difference, which must not be
+ * read as money saved. The shadow's model never ran, and both sides are priced
+ * from the same success probabilities, so a miscalibrated predictor shifts them
+ * together and the delta preserves the error rather than exposing it. What the
+ * comparison supports is narrower: how often the policies disagree, and which
+ * model the alternative prefers. Claiming one is better needs outcomes for both
+ * arms, which is offline policy evaluation.
  */
 
 import type { ModelRegistry } from '../registry/model-registry.js';

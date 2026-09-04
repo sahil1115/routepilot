@@ -1,15 +1,11 @@
 /**
  * Learned success model (spec sections 35, 36, 37 and 39).
  *
- * Learns `P(success | features, model)` online from observed outcomes, and
- * hands the result to the same expected-cost arithmetic that already decides
- * routes. Nothing else about routing changes: a better-calibrated success
- * probability makes the Phase 9 cost model produce better answers on its own.
+ * Learns `P(success | features, model)` online and hands the result to the same
+ * expected-cost arithmetic that already decides routes.
  *
- * ## Backoff, because data is always sparse somewhere
- *
- * Observations are stored per `(model, taskType, scope)` and read back as a
- * three-level chain, each level shrunk toward the one above it:
+ * Observations are stored per bucket and read back as a chain, each level
+ * shrunk toward the one above:
  *
  * ```
  * configured prior
@@ -18,32 +14,19 @@
  *   -> this exact bucket                  (competence at exactly this)
  * ```
  *
- * A model with 400 observations spread thinly across task types still gets a
- * useful estimate for a task type it has seen twice: the specific bucket sits
- * near the model's general rate, which sits near the configured prior. No level
- * needs a minimum of its own, because a level with no data shrinks completely
- * into its parent and contributes nothing (spec section 37).
+ * No level needs a minimum of its own: one with no data shrinks completely into
+ * its parent and contributes nothing (spec section 37).
  *
- * **The levels partition the data; they do not nest.** Each level counts only
- * the observations the deeper levels exclude, so every observation enters the
- * chain exactly once and the three level counts sum to the model's total. The
- * obvious alternative -- each level aggregating all the data beneath it --
- * would feed the same observations through the shrinkage three times, and
- * produce confidence that grows with the depth of the hierarchy rather than
- * with the evidence.
+ * The levels partition the data rather than nesting. Each counts only what the
+ * deeper levels exclude, so every observation enters the chain once. Letting
+ * each level aggregate everything beneath it would feed the same observations
+ * through the shrinkage repeatedly, producing confidence that grows with the
+ * depth of the hierarchy instead of with the evidence.
  *
- * ## What this deliberately is not
- *
- * Not a bandit. There is no exploration term, no optimism bonus, no
- * randomisation — Phase 10's brief excludes contextual bandits, and
- * architectural principle 9 forbids randomly selecting an expensive model.
- * Given the same stored statistics, this model returns the same number every
- * time, so routing stays deterministic.
- *
- * There is also **no time decay**. Weighting recent outcomes more heavily would
- * need a clock in the estimate path and would make a routing decision depend on
- * when it was made. That is a real limitation — a model that silently
- * regresses is learned slowly — and it is recorded rather than papered over.
+ * Not a bandit: no exploration term, no optimism, no randomisation, so routing
+ * stays deterministic (principle 9). No time decay either -- it would put a
+ * clock in the estimate path and make a decision depend on when it was made.
+ * The cost is that a model which silently regresses is learned slowly.
  */
 
 import type {

@@ -1,26 +1,20 @@
 /**
  * SQLite telemetry store (spec sections 33 and 34).
  *
- * Local-first: a file on the user's own disk, never a network call. Nothing
- * here reaches out anywhere.
+ * Local-first: a file on the user's own disk, never a network call.
  *
- * Three behaviours matter more than the SQL:
+ * Three behaviours matter more than the SQL. Telemetry never breaks routing --
+ * every write is wrapped, so a failed insert, a locked database or a full disk
+ * degrades to "nothing was recorded" rather than failing the task (rule 17). A
+ * corrupt database is recoverable unaided: the file is moved aside, a fresh one
+ * started, and the quarantined path reported, because refusing to run over
+ * unreadable history is worse than losing it. And redaction happens here at the
+ * boundary, so callers need not remember.
  *
- * 1. **Telemetry never breaks routing.** Every write is wrapped so that a
- *    failed insert, a locked database or a full disk degrades to "nothing was
- *    recorded" rather than failing the user's task (spec section 2, rule 17).
- * 2. **A corrupt database is recoverable without help.** If the file cannot be
- *    opened, it is moved aside and a fresh one started, with the quarantined
- *    path reported. Losing history is bad; refusing to run because history is
- *    unreadable is worse.
- * 3. **Redaction happens here, at the boundary.** Callers do not have to
- *    remember.
- *
- * `node:sqlite` is used rather than a native dependency. It is currently an
- * experimental Node API, so it is imported lazily — a build with telemetry
- * disabled never loads it and never prints its experimental warning. The whole
- * surface sits behind `TelemetryStore`, so replacing it later touches this file
- * only.
+ * `node:sqlite` is used rather than a native dependency. It is still an
+ * experimental Node API, so it is imported lazily and a build with telemetry
+ * disabled never loads it or prints its warning. The surface sits behind
+ * `TelemetryStore`, so replacing it later touches this file only.
  */
 
 import { mkdirSync, renameSync, existsSync } from 'node:fs';

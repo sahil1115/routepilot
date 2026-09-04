@@ -1,26 +1,21 @@
 /**
  * Expected cost to success (spec sections 1, 14 and 15).
  *
- * This is the file that encodes RoutePilot's central claim: the right thing to
- * minimise is **expected total cost to a successful completion**, not the price
- * of the first attempt. A model that costs $0.02 and fails 40% of the time can
- * easily be more expensive than one that costs $0.07 and fails 10%, once the
- * retry and the escalation are paid for.
+ * Minimise expected total cost to a successful completion, not the price of the
+ * first attempt. A model costing $0.02 that fails 40% of the time is easily
+ * dearer than one costing $0.07 that fails 10%, once the retry and the
+ * escalation are paid for.
  *
  *     expectedTotal(m) = initial(m)
- *                      + P(fail | m) × [ retryShare × initial(m)
- *                                      + escalationShare × expectedTotal(next) ]
+ *                      + P(fail | m) x [ retryShare x initial(m)
+ *                                      + escalationShare x expectedTotal(next) ]
  *
- * where `next` is the cheapest-to-success model strictly stronger than `m`.
+ * where `next` is the cheapest-to-success model strictly stronger than `m`. The
+ * recursion terminates because candidates are processed strongest to weakest.
+ * Every input is a configured prior; nothing here is measured yet.
  *
- * The recursion terminates because candidates are processed from strongest to
- * weakest, and the strongest model has nothing to escalate to. Every input is a
- * configured prior; nothing here is measured yet. Phase 12 replaces the
- * constants with observations.
- *
- * The arithmetic itself lives in `expected-cost.ts` as a pure function, so it
- * can be reasoned about and tested without a registry or a task. This file is
- * responsible only for pricing tokens and resolving escalation targets.
+ * The arithmetic lives in `expected-cost.ts` as a pure function. This file only
+ * prices tokens and resolves escalation targets.
  */
 
 import { priceModelTokens, isComparableCurrency } from '../pricing.js';

@@ -1,29 +1,20 @@
 /**
  * A throwaway repository for real agent runs.
  *
- * Every existing test drives a *scripted* agent: `ScriptedExecutor` returns
- * canned results, and `stub-cli.ts` writes a Node script that prints a canned
- * transcript. Both prove RoutePilot handles the shapes it was told to expect.
- * Neither can prove those are the shapes a real agent produces when asked to do
- * actual work — and the only real runs so far used the prompt "Reply with
- * exactly the word OK. Do not use any tools."
+ * Scripted tests -- `ScriptedExecutor` and `stub-cli.ts` -- prove RoutePilot
+ * handles the shapes it was told to expect. They cannot prove those are the
+ * shapes a real agent produces when asked to do actual work.
  *
- * This is the workspace for closing that gap. It is a real directory with a
- * real failing test, so an agent can be asked to fix something and the result
- * can be checked by running the test rather than by reading the agent's word
- * for it.
- *
- * ## Safety
+ * This is a real directory with a real failing test, so an agent can be asked
+ * to fix something and the result checked by running the test rather than by
+ * taking the agent's word for it.
  *
  * A real agent gets write access to whatever directory it is pointed at, so
- * this one is built to be worth nothing:
- *
- * - created under the system temp directory, never inside a real repository;
- * - no network access, no credentials, no `.env`, nothing to exfiltrate;
- * - the "test runner" is a self-contained Node script, so a task can run tests
- *   without installing anything;
- * - deleted afterwards, and the deletion is best-effort so a locked file cannot
- *   fail a verification that already succeeded.
+ * this one is built to be worth nothing: created under the system temp
+ * directory, never inside a real repository; no network, no credentials, no
+ * `.env`; a self-contained Node test runner needing no install; and deleted
+ * afterwards, best-effort, so a locked file cannot fail a verification that
+ * already succeeded.
  */
 
 import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';

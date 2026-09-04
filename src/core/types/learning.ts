@@ -1,24 +1,12 @@
 /**
- * Learning types (spec sections 35, 36, 37 and 39).
+ * Learning types (spec sections 35-37, 39).
  *
- * Phase 10 learns exactly one thing: **P(success | features, model)**. Not a
- * bandit, not a policy, not a value function — a calibrated probability that
- * replaces a guessed prior with an observed rate, and feeds the same
- * expected-cost arithmetic that was already deciding routes in Phase 9.
+ * Learns one thing: P(success | features, model), feeding the same
+ * expected-cost arithmetic that already decides routes.
  *
- * Three rules shape every type in this file, and each exists because the
- * specification forbids a specific dishonesty:
- *
- * 1. **A sample count is a count of real observations.** Bayesian shrinkage
- *    works by treating a prior as if it were pseudo-observations, and it would
- *    be trivial — and completely wrong — to report that pseudo-count as data.
- *    {@link LearnedStats.observations} is an integer count of admitted
- *    outcomes and nothing else (spec section 2, rule 11).
- * 2. **Absent is not zero.** A model with no observations has an *unknown*
- *    success rate, not a zero one. It falls back to its configured prior.
- * 3. **Learning is off until it has earned the right to be on.** Below
- *    `minimumTrainingSamples`, a learned estimate must not move a routing
- *    decision at all (spec section 2, rule 12).
+ * Three invariants: sample counts are real observations and never include
+ * prior pseudo-counts (rule 11); absent is unknown, not zero; and learning
+ * cannot move a decision below `minimumTrainingSamples` (rule 12).
  */
 
 import type { TaskScope } from './features.js';
@@ -27,28 +15,20 @@ import type { TaskType } from './task.js';
 /**
  * The bucket an observation belongs to.
  *
- * Deliberately coarse. Learning `P(success | exact feature vector, model)`
- * directly would give every request its own bucket and never accumulate two
- * observations in the same place. Task type and scope are the two features that
- * most change what a model is being asked to do, and both are already
- * classified deterministically upstream.
+ * Deliberately coarse: keying on the full feature vector would give every
+ * request its own bucket and never accumulate two observations in one place.
  */
 export interface LearningContext {
   readonly modelId: string;
   readonly taskType: TaskType;
   readonly scope: TaskScope;
   /**
-   * Primary language of the repository, or `'unknown'`.
+   * Primary language, or `'unknown'`.
    *
-   * The static predictor already discriminates by language through
-   * `ModelSpec.priors.languages`, so a model that is strong in TypeScript and
-   * weak in Rust is scored differently before any evidence exists. Until Phase
-   * 25 the learned posterior pooled both into one bucket and shrank the
-   * language-aware prior toward a language-blind rate -- so learning actively
-   * washed out the one dimension static routing had right.
-   *
-   * Normalised, never a raw path. Repository identity is deliberately absent:
-   * it would make every bucket a sample of one.
+   * Static priors already discriminate by language, so pooling languages would
+   * shrink a language-aware prior toward a language-blind rate. Normalised,
+   * never a raw path; repository identity is excluded because it would make
+   * every bucket a sample of one.
    */
   readonly language: string;
 }
@@ -56,17 +36,12 @@ export interface LearningContext {
 /**
  * One admitted outcome, ready to be learned from.
  *
- * Constructed by the caller rather than derived from a `TaskOutcome` inside the
- * model, because attribution is a judgement — see `observationFromOutcome`,
- * which refuses to attribute an escalated task to any single model.
+ * Built by the caller, not derived inside the model: attribution is a
+ * judgement, and `observationFromOutcome` refuses to credit an escalated task
+ * to any single model.
  */
 export interface Observation extends LearningContext {
-  /**
-   * How successful the task was, in [0, 1].
-   *
-   * Fractional because success is multi-dimensional (Phase 8): code that builds
-   * and lints but fails its tests is not a total loss and not a win.
-   */
+  /** Success in [0, 1]. Fractional: code that builds but fails tests is neither. */
   readonly success: number;
   /** How much of the possible evidence backed that score, in [0, 1]. */
   readonly evidence: number;
@@ -75,23 +50,13 @@ export interface Observation extends LearningContext {
 /**
  * Accumulated evidence for one bucket.
  *
- * Stored at the finest granularity only — `(modelId, taskType, scope)`. Coarser
- * views are summed at read time, so a single observation is never counted twice
- * and no aggregate can drift out of step with its parts.
+ * Stored at the finest granularity only; coarser views are summed at read time,
+ * so nothing is double-counted and no aggregate can drift from its parts.
  */
 export interface LearnedStats extends LearningContext {
-  /**
-   * Number of real admitted outcomes. An integer, always.
-   *
-   * Never includes prior pseudo-counts. This is the number a user is shown when
-   * they ask how much RoutePilot actually knows.
-   */
+  /** Real admitted outcomes. Always an integer, never prior pseudo-counts. */
   readonly observations: number;
-  /**
-   * Sum of `success` over those observations, in [0, observations].
-   *
-   * Kept as mass rather than a mean so that merging two buckets is addition.
-   */
+  /** Sum of `success`, in [0, observations]. Mass, not a mean, so merging is addition. */
   readonly successMass: number;
   /** Last update, for inspection only. Never used in estimation. */
   readonly updatedAt: number;
@@ -100,10 +65,8 @@ export interface LearnedStats extends LearningContext {
 /** One level of the backoff hierarchy, exposed so an estimate can be audited. */
 export interface LearnedLevel {
   /**
-   * `model`, `model+task`, `model+task+scope`, or `model+task+scope+language`.
-   *
-   * Coarsest first. The four are **disjoint**: each counts only what the
-   * deeper ones exclude, so every observation enters the chain exactly once.
+   * Coarsest first. The four levels are disjoint -- each counts only what the
+   * deeper ones exclude -- so every observation enters the chain exactly once.
    */
   readonly level: 'model' | 'task' | 'scope' | 'language';
   /** Real observations aggregated at this level. */
@@ -115,23 +78,15 @@ export interface LearnedLevel {
 }
 
 /**
- * A success probability with its provenance.
- *
- * Every field answers a question a user is entitled to ask about a routing
- * decision: what did you think before, what do you think now, how much do you
- * actually know, and did any of it change the answer.
+ * A success probability with its provenance: the prior, the posterior, the
+ * evidence behind it, and whether any of it changed the answer.
  */
 export interface LearnedEstimate {
   /** The probability routing should use. */
   readonly probability: number;
   /** What the static priors alone said. */
   readonly staticProbability: number;
-  /**
-   * Whether learning moved the estimate.
-   *
-   * False when learning is disabled, when there are too few observations, or
-   * when the posterior happens to equal the prior.
-   */
+  /** Whether learning moved the estimate. False if disabled, starved, or unchanged. */
   readonly applied: boolean;
   /** Total real observations for this model, across all task types. */
   readonly observations: number;
@@ -144,9 +99,8 @@ export interface LearnedEstimate {
 /**
  * Persistence for learned statistics.
  *
- * Separate from the estimate path on purpose: the model holds its statistics in
- * memory and writes through, so a routing decision never waits on I/O and a
- * failed write can never fail a user's task.
+ * The model holds statistics in memory and writes through, so routing never
+ * waits on I/O and a failed write cannot fail a user's task.
  */
 export interface LearningStore {
   /** Whether this store actually persists anything. */

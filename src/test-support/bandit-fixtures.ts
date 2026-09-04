@@ -1,40 +1,27 @@
 /**
  * A synthetic bandit environment with known ground truth.
  *
- * "Use synthetic simulations before real activation." Exploration deliberately
- * spends money on a model the router does not currently believe is best, so
- * before that is allowed anywhere near a real workspace it has to be shown, in
- * a world where the right answer is known, that it pays for itself and then
- * stops.
+ * Exploration spends money on a model the router does not believe is best, so
+ * it must first be shown -- where the right answer is known -- to pay for
+ * itself and then stop.
  *
- * ## The scenario
- *
- * | model | prior | **true rate** | first attempt |
+ * | model | prior | true rate | first attempt |
  * | --- | --- | --- | --- |
  * | `sim/steady` | 0.92 | 0.90 | 0.135 |
- * | `sim/sleeper` | 0.55 | **0.98** | 0.090 |
+ * | `sim/sleeper` | 0.55 | 0.98 | 0.090 |
  *
- * The gap matters. An earlier version of this fixture had the two arms within
- * 0.0001 of each other on expected cost, which made each trivially "plausibly
- * better" than the other: the bandit alternated forever, reported an
- * experiment on 95 rounds out of 100, and demonstrated nothing. Arms that are
- * genuinely equivalent make a bandit look broken while it is behaving
- * correctly, so the fixture separates them.
+ * The gap is deliberate. Arms within 0.0001 of each other on expected cost are
+ * each trivially "plausibly better", so the bandit alternates forever and
+ * demonstrates nothing.
  *
- * `steady` is honestly configured and perfectly adequate. `sleeper` is cheaper
- * *and* better, and its pessimistic prior means expected-cost routing will
- * never choose it — so it is never run, so nothing is ever learned about it.
- * Exploitation alone is stuck at a local optimum forever, and no amount of data
- * about `steady` can reveal that, because the data that would is never
- * collected.
+ * `sleeper` is cheaper and better, but its pessimistic prior means
+ * expected-cost routing never picks it, so nothing is ever learned about it.
+ * Exploitation alone is stuck at a local optimum, and no amount of data about
+ * `steady` reveals that. Hence the simulation measures total cost over a run of
+ * tasks: exploration always loses the first task, and the question is whether it
+ * wins over a hundred.
  *
- * That is the precise situation a bandit exists for, and it is why the
- * simulation measures **total cost over a run of tasks** rather than the
- * quality of any single decision. Exploration always loses on the first task.
- * The question is whether it wins over a hundred.
- *
- * Everything is deterministic — successes are spread by even spacing, never
- * drawn — so the whole simulation produces identical numbers on every run.
+ * Deterministic throughout -- successes are spread by even spacing, never drawn.
  *
  * Excluded from the published build (see tsconfig.build.json).
  */

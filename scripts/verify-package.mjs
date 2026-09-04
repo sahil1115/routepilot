@@ -2,25 +2,18 @@
 /**
  * Prove the extension package can stand on its own.
  *
- * A `.vsix` is a self-contained archive installed to a directory with no
- * ancestor `node_modules`. Inside the repository every runtime dependency
- * resolves anyway, because Node walks up and finds the root `node_modules` —
- * so a package missing its own copy of a dependency works perfectly on the
- * machine that built it and crashes on every machine that installs it.
+ * A `.vsix` installs to a directory with no ancestor `node_modules`. Inside the
+ * repository every runtime dependency resolves anyway, because Node walks up to
+ * the root `node_modules` -- so a package missing its own copy works perfectly
+ * on the machine that built it and crashes on every machine that installs it.
+ * That happened: `zod` was declared in `extension/package.json` and never
+ * installed into `extension/node_modules`.
  *
- * That is exactly what happened: `zod` was declared in `extension/package.json`
- * but nothing ever installed it into `extension/node_modules`, so the packaged
- * extension resolved `zod` from the repository root and would have failed with
- * `Cannot find package 'zod'` the first time a user opened it.
- *
- * ## How this checks it
- *
- * Not by putting the files somewhere isolated and hoping: a temporary directory
- * can itself sit under an ancestor `node_modules` (this machine has one at
- * `C:\Users\<name>\node_modules`), and the check would then pass for the wrong
- * reason. Instead it resolves each declared dependency the way Node will and
- * asserts **where the resolution lands**. A copy inside `extension/` is
- * self-contained; anything outside it is borrowed and will not ship.
+ * Checking this by isolating the files would not be enough, since a temp
+ * directory can itself sit under an ancestor `node_modules`. Instead each
+ * declared dependency is resolved the way Node will and the check asserts where
+ * the resolution lands: inside `extension/` is self-contained, anything outside
+ * it is borrowed and will not ship.
  *
  * Run by `npm run verify:extension` and `npm run package:extension`.
  * Exit code 0 means the package is self-contained.

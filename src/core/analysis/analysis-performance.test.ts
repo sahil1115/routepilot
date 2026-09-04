@@ -4,7 +4,7 @@
  *
  * A benchmark measures; it cannot fail a build when someone reintroduces a
  * sequential loop. These tests can, because the filesystem and git ports make
- * the work **countable** — which is the reason Phase 2 made them ports.
+ * the work **countable** -- which is the reason Phase 2 made them ports.
  *
  * Nothing here asserts a duration. Wall-clock thresholds fail on a busy machine
  * and teach nothing; the number of operations is what actually changed.

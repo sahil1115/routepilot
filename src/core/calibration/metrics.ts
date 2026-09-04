@@ -2,9 +2,7 @@
  * Calibration metrics (spec section 41).
  *
  * Pure arithmetic over `(predicted, actual)` pairs, isolated so it can be
- * checked against hand-computed values without a router, a store or a model.
- *
- * ## The metrics, and why each is here
+ * checked against hand-computed values without a router, store or model.
  *
  * ```
  * Brier score  = mean( (p - o)^2 )                     lower is better
@@ -19,19 +17,15 @@
  * skill        = 1 - BS / BS_baseRate                  higher is better
  * ```
  *
- * The Brier score alone is not enough to decide whether a predictor may be
- * trusted, and relying on it would be the easy mistake. A predictor that
- * answers `0.78` to every question can score respectably while being incapable
- * of distinguishing a task it will fail from one it will pass. `resolution` and
- * `brierSkillScore` are what catch that, and the safeguard checks them.
+ * The Brier score alone cannot decide whether a predictor may be trusted: one
+ * that answers 0.78 to everything scores respectably while distinguishing
+ * nothing. `resolution` and `brierSkillScore` catch that, and the safeguard
+ * checks them.
  *
- * ## On the decomposition
- *
- * `BS = reliability - resolution + uncertainty` is **exact** only when the
- * predictions inside each bin are identical. With ranged bins a within-bin
- * spread term survives. Rather than assert an approximation, this module
- * computes the leftover explicitly as `decompositionResidual`, so the identity
- * can be verified rather than assumed.
+ * The decomposition is exact only when predictions within each bin are
+ * identical; with ranged bins a within-bin spread term survives. It is computed
+ * explicitly as `decompositionResidual` so the identity can be verified rather
+ * than assumed.
  */
 
 import type { CalibrationBin, CalibrationReport, PredictionRecord } from '../types/calibration.js';

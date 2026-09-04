@@ -10,15 +10,12 @@
  *  10. Only then proceed.
  *
  * Steps 1-5 are machine work and this script does them. Steps 6-9 are
- * judgement, and a script cannot do judgement — but it can refuse to say
- * "proceed" until the *evidence* of each one exists, which is what it does.
- * Step 10 is the verdict.
+ * judgement, which a script cannot do -- but it can refuse to say "proceed"
+ * until the evidence of each one exists. Step 10 is the verdict.
  *
- * Design note, and the reason this is not just `npm run verify`: the failure
- * this guards against is not a red test. It is a phase that ends with green
- * tests, an undocumented change, and nothing written down — which looks
- * identical to a finished phase until someone needs the history six weeks
- * later.
+ * This is not `npm run verify` because the failure it guards against is not a
+ * red test: it is a phase that ends green, undocumented, and unrecorded, which
+ * looks identical to a finished one until someone needs the history later.
  *
  * Run with `npm run phase`.
  *

@@ -1,46 +1,32 @@
 /**
- * Exit-code contract.
+ * Exit-code contract. Stable; scripts and CI may rely on these.
  *
- * RoutePilot is meant to be driven from scripts and CI as well as by hand, so
- * the difference between "the tool broke" and "the tool worked and declined to
- * route" has to be visible without parsing output.
- *
- * A caller can rely on these staying stable.
+ * The distinction that matters is "the tool broke" versus "the tool worked and
+ * declined", which must be visible without parsing output.
  */
 
 /** The command did what was asked. */
 export const EXIT_OK = 0;
 
-/**
- * The command failed to run: unreadable or invalid configuration, an I/O
- * failure, an unknown model id. Something is wrong and needs fixing.
- */
+/** The command failed: bad configuration, I/O failure, unknown model id. */
 export const EXIT_ERROR = 1;
 
 /** The command line itself was wrong: unknown command, bad flag, bad value. */
 export const EXIT_USAGE = 2;
 
 /**
- * Routing completed successfully but selected no model.
- *
- * Distinct from {@link EXIT_ERROR} on purpose. Nothing is broken — the router
- * examined the candidates and declined, because none met the confidence
- * threshold, or none fitted the budget, or none satisfied the hard constraints.
- * A script can retry with a different policy rather than treating it as a
- * crash.
+ * Routing succeeded but selected no model: none met the confidence threshold,
+ * fitted the budget, or satisfied the hard constraints. Nothing is broken, so a
+ * script can retry with a different policy rather than treat it as a crash.
  */
 export const EXIT_NO_MODEL = 3;
 
 /**
- * The task ran, nothing contradicted it, and nothing confirmed it.
+ * The task ran, nothing contradicted it, and nothing confirmed it -- usually
+ * because the workspace declares no test, build or typecheck script.
  *
- * Distinct from {@link EXIT_ERROR}, which means the tool broke, and from
- * {@link EXIT_OK}, which would let `routepilot run --execute && deploy` proceed
- * on work nobody checked. Non-zero so a chain stops; its own code so a script
- * can tell "unverified" from "failed" and decide which it can live with.
- *
- * Most often this means the workspace declares no test, build or typecheck
- * script for RoutePilot to run.
+ * Non-zero so `run --execute && deploy` stops; its own code so a script can
+ * tell "unverified" from "failed".
  */
 export const EXIT_UNVERIFIED = 4;
 

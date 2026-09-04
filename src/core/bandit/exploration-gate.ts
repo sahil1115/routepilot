@@ -1,37 +1,27 @@
 /**
  * The exploration safety gate (spec section 40).
  *
- * Exploration means deliberately choosing a model the router does **not**
- * currently believe is best, in order to learn whether it might be. That is a
- * reasonable thing to do with a rename in a scratch branch and an indefensible
- * thing to do with a production database migration, so this file is the list of
+ * Exploration means deliberately choosing a model the router does not believe
+ * is best. That is reasonable for a rename in a scratch branch and
+ * indefensible for a production database migration, so this file lists the
  * places it must never happen.
  *
- * ## The rule
- *
- * Every block is a **hard** block. There is no scoring, no weighting, and no
- * combination of favourable conditions that overrides one. The gate returns the
- * first reason it finds and exploration does not occur.
- *
- * The specification names five conditions, and they are the five checks below
- * plus the two prerequisites that must hold before any of it applies:
+ * Every block is hard. There is no scoring and no combination of favourable
+ * conditions that overrides one; the gate returns the first reason it finds.
  *
  * | condition | why |
  * | --- | --- |
- * | high risk | a failed experiment on a risky task is a real cost, not a data point |
+ * | high risk | a failed experiment on a risky task is a cost, not a data point |
  * | budget disallows it | information is worth paying for, but not unboundedly |
  * | user picked a model | an explicit choice is a decision, not a hint (rule 8) |
  * | production / critical | the wrong place to find out something new |
- * | destructive task | a failure may not be recoverable, so there is no retry to learn from |
+ * | destructive task | a failure may not be recoverable, so nothing is learned |
  *
- * ## Why the default is off, and stays off until there is data
- *
- * Exploration before there is anything to compare against is not exploration,
- * it is guessing with extra steps: with no observations every model looks
- * equally uncertain, so the bandit would pick on optimism alone and reliably
- * choose whichever model has the widest posterior. Hence `enabled` defaults to
- * false and `minimumObservations` gates it even when switched on
- * (spec section 40, and architectural principles 9 and 12).
+ * `enabled` defaults to false and `minimumObservations` gates it even when
+ * switched on. Exploring before there is anything to compare against is
+ * guessing: with no observations every model looks equally uncertain, so the
+ * bandit would pick on optimism alone and reliably choose whichever model has
+ * the widest posterior (section 40; principles 9 and 12).
  */
 
 import type { RoutingFeatures, TaskHazard } from '../types/features.js';

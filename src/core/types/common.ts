@@ -6,10 +6,8 @@
  */
 
 /**
- * A score constrained to the closed interval [0, 1].
- *
- * This is a documentation alias, not a branded type — validation is enforced at
- * the configuration boundary (see `src/config/schema.ts`).
+ * A score in [0, 1]. A documentation alias, not a branded type; validation
+ * happens at the configuration boundary (`src/config/schema.ts`).
  */
 export type UnitInterval = number;
 
@@ -20,11 +18,9 @@ export const AVAILABILITY_STATES = ['available', 'degraded', 'unavailable'] as c
 export type Availability = (typeof AVAILABILITY_STATES)[number];
 
 /**
- * Whether an availability state permits selection at all.
- *
- * `degraded` remains selectable — it is a signal for the routing engine to
- * penalise a candidate, not a hard exclusion. Only `unavailable` is a hard
- * exclusion (spec section 12).
+ * Whether an availability state permits selection. `degraded` stays selectable
+ * and is penalised by the routing engine; only `unavailable` excludes
+ * (spec section 12).
  */
 export function isSelectable(availability: Availability): boolean {
   return availability !== 'unavailable';

@@ -2,39 +2,23 @@
  * Shadow policy types (spec sections 42, 43 and 44).
  *
  * A shadow policy answers "what would a different router have done?" without
- * spending anything to find out. The current policy decides and executes; every
- * shadow policy decides and is **recorded**.
+ * spending anything. The current policy decides and executes; shadow policies
+ * decide and are recorded.
  *
- * ## The non-execution guarantee
+ * Non-execution is structural: `ShadowRouter` is built from a model registry
+ * and nothing else, `src/core/**` may not import `src/adapters/**` (enforced by
+ * an architectural test), and a shadow outcome carries a model id rather than a
+ * session, so there is no handle to execute by mistake.
  *
- * Nothing in this file, or in `src/core/shadow`, can start an execution. That
- * is not a convention to be remembered — it is structural:
- *
- * - `ShadowRouter` is constructed from a model registry and nothing else. It
- *   has no adapter, no process runner, and no way to obtain one.
- * - `src/core/**` may not import from `src/adapters/**`, which is enforced by
- *   an architectural test.
- * - A shadow outcome carries a **model id**, never a session, so there is no
- *   handle a caller could execute even by mistake.
- *
- * ## What shadow data does and does not prove
- *
- * This is the part it would be easy to get wrong, and the cost of getting it
- * wrong is a confident, false claim that some policy is cheaper.
- *
- * A shadow comparison **can** tell you how often two policies disagree, which
- * models a candidate policy prefers, and what the difference would cost *under
- * the current estimates*.
- *
- * It **cannot** tell you the shadow policy is better. The shadow's model was
- * never run, so no outcome exists for it. Worse, the cost delta is computed
- * from the very success probabilities that produced the current decision: if
- * those are miscalibrated, both sides of the comparison are wrong in the same
- * direction, and the delta inherits the error rather than revealing it.
+ * A shadow comparison can tell you how often two policies disagree, which
+ * models a candidate prefers, and what the difference costs under current
+ * estimates. It cannot tell you the shadow policy is better: its model never
+ * ran, and the delta is computed from the same success probabilities that
+ * produced the live decision, so miscalibration moves both sides together.
  *
  * Every quantity here is therefore named as an estimate, and
- * {@link ShadowOutcome.estimatedCostDelta} is `null` whenever either side
- * selected nothing rather than being reported as a saving (spec section 44).
+ * {@link ShadowOutcome.estimatedCostDelta} is `null` when either side selected
+ * nothing rather than being reported as a saving (spec section 44).
  */
 
 import type { ModelTier } from './model.js';

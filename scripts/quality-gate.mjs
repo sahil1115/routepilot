@@ -2,25 +2,18 @@
 /**
  * RoutePilot final quality gate (spec section 71).
  *
- * Runs every gate, then maps each item on the specification's checklist to the
- * **evidence that actually proves it** — the named tests that exercise it, or a
- * static check over the source.
+ * Runs every gate, then maps each checklist item to the evidence that proves it
+ * -- the named tests that exercise it, or a static check over the source.
  *
- * ## Why this exists rather than a hand-written report
+ * A checklist ticked by hand is a claim about a moment. This re-derives every
+ * tick from the suite, so an item cannot stay ticked once the tests justifying
+ * it are deleted or renamed: evidence that has vanished is reported as BROKEN,
+ * which is louder than a silent pass.
  *
- * A checklist ticked by a human once is a claim about a moment. This re-derives
- * every tick from the suite, so an item cannot stay ticked after the tests that
- * justified it are deleted or renamed: a checklist item whose evidence has
- * vanished is reported as **BROKEN**, which is louder than a silent pass.
- *
- * ## Three verdicts, not two
- *
- * - **PASS** — evidence exists and every piece of it passed.
- * - **PARTIAL** — the capability works in part, and the part that does not is
- *   named. Ticking these would be a lie by omission.
- * - **CANNOT VERIFY** — no evidence can be produced here, with the reason.
- *   Three items are in this state and all three trace to the same root cause:
- *   nothing has ever been executed against a real model.
+ * Three verdicts. PASS means evidence exists and passed. PARTIAL means the
+ * capability works in part and names the part that does not, because ticking
+ * those would be a lie by omission. CANNOT VERIFY means no evidence can be
+ * produced here, with the reason.
  *
  * Usage: npm run gate
  */

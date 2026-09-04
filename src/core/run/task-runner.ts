@@ -1,7 +1,7 @@
 /**
  * The task runner (spec sections 17, 22, 27 and 31).
  *
- * Joins the pipeline every phase since 5 has been building one piece of:
+ * Joins the pipeline:
  *
  * ```
  * route -> execute -> monitor -> validate -> classify -> escalate -> score
@@ -9,29 +9,19 @@
  *                        +-------------- retry / handoff -----+
  * ```
  *
- * Nothing here is new machinery. Every stage is a component that already
- * existed and was already tested in isolation; this is the thing that had been
- * missing, which is why `routepilot route` could choose a model and nothing
- * could run one.
+ * Every stage is a component tested in isolation; this is what connects them.
  *
- * ## What the loop guarantees
+ * The loop guarantees four things. A failure is classified before anything is
+ * decided about it, so a provider outage does not buy a more expensive model to
+ * solve a problem it does not have (section 22). Only a model-attributable
+ * failure updates beliefs -- an outage, a cancellation or an ambiguous request
+ * says nothing about the model, and recording it would corrupt learning
+ * (principle 10). Escalation is bounded, and a run that exhausts its limits
+ * stops with a reason. And the next model is briefed with a compact summary,
+ * not handed a transcript (section 28).
  *
- * - **A failure is classified before anything is decided about it.** Escalating
- *   on a provider outage would buy a more expensive model to solve a problem it
- *   does not have (spec section 22).
- * - **Only a model-attributable failure updates beliefs.** A database being
- *   down, a cancelled run, an ambiguous request — none of these say anything
- *   about the model, and recording them as failures would corrupt learning
- *   (architectural principle 10).
- * - **Escalation is bounded.** The engine's limits are honoured, and a run that
- *   exhausts them stops with a reason rather than climbing forever.
- * - **The next model is briefed, not handed a transcript.** The handoff is a
- *   compact summary (spec section 28).
- *
- * ## Determinism and time
- *
- * The clock is injected. Durations come from it and nothing else, so a replay
- * with a scripted clock produces identical results.
+ * The clock is injected and durations come from it alone, so a replay with a
+ * scripted clock produces identical results.
  */
 
 import type { AgentEvent, AgentExecutionRequest } from '../types/agent.js';

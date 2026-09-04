@@ -1,41 +1,18 @@
 /**
  * Uncertainty and optimism (spec sections 36 and 40).
  *
- * Phase 10 produces a success probability. This produces the *width* around it,
- * which is what makes principled exploration possible: a model estimated at
- * 0.70 from twelve observations and one estimated at 0.70 from four hundred are
- * the same number carrying completely different amounts of doubt, and only the
- * first is worth spending money to learn more about.
+ * The width around a success probability. 0.70 from twelve observations and
+ * 0.70 from four hundred carry very different doubt, and only the first is
+ * worth paying to learn about.
  *
- * ## Why an upper confidence bound rather than sampling
+ * Thompson sampling is deliberately not used: decisions must be deterministic,
+ * and principle 9 forbids randomly selecting an expensive model. An upper
+ * confidence bound gives the same optimism deterministically.
  *
- * The textbook bandit answer is Thompson sampling — draw from the posterior and
- * act on the draw. It is deliberately **not** used here, for two reasons that
- * are not about statistics:
- *
- * 1. **Determinism has been a hard requirement since Phase 3.** The same inputs
- *    must produce byte-identical decisions. A sampled policy cannot promise
- *    that, and a router whose answer changes between two identical invocations
- *    is one nobody can debug.
- * 2. **Architectural principle 9 forbids randomly selecting an expensive
- *    model.** Thompson sampling does exactly that, occasionally, by design.
- *
- * An upper confidence bound gives the same optimism-in-the-face-of-uncertainty
- * behaviour deterministically: rank by what a model could plausibly be worth at
- * its best, not by what it is expected to be worth.
- *
- * ## The posterior width
- *
- * The learned model is Beta-Bernoulli, so the posterior around mean `p` with
- * concentration `n` (the prior's pseudo-count plus real observations) has
- *
- * ```
- * variance = p (1 - p) / (n + 1)
- * ```
- *
- * The width therefore shrinks as evidence accumulates — which is what makes
- * exploration self-limiting rather than a permanent tax. A model explored
- * enough times stops looking uncertain, and the bandit stops paying to try it.
+ * The posterior is Beta-Bernoulli, so `variance = p(1-p)/(n+1)` where `n` is
+ * the prior pseudo-count plus real observations. The width shrinks as evidence
+ * accumulates, which makes exploration self-limiting rather than a permanent
+ * tax.
  */
 
 /** Inputs to a confidence bound. */
@@ -43,10 +20,8 @@ export interface UncertaintyInput {
   /** Posterior mean success probability, in [0, 1]. */
   readonly probability: number;
   /**
-   * Total evidence behind it: prior pseudo-count plus real observations.
-   *
-   * Must be positive. The prior always contributes, so this is never zero even
-   * for a model that has never been tried.
+   * Prior pseudo-count plus real observations. Always positive, since the prior
+   * contributes even to a model that has never been tried.
    */
   readonly concentration: number;
 }
@@ -73,14 +48,11 @@ export function posteriorStdDev(input: UncertaintyInput): number {
 /**
  * Optimistic upper bound on a success probability.
  *
- * `optimism` is how many standard deviations of benefit of the doubt to give.
- * At 1 the bound sits around the 84th percentile of the posterior; at 2, around
- * the 98th. Higher means more willing to gamble on a model that might be good.
+ * `optimism` is how many standard deviations of benefit of the doubt to give:
+ * 1 is roughly the 84th percentile, 2 roughly the 98th. Clamped to
+ * `[probability, 1]`.
  *
- * The result is clamped to `[probability, 1]`: a bound below the mean would be
- * a contradiction, and above 1 is not a probability.
- *
- * @throws RangeError on a negative optimism, or on the inputs
+ * @throws RangeError on negative optimism, or on the inputs
  *   {@link posteriorStdDev} rejects.
  */
 export function upperConfidenceBound(input: UncertaintyInput, optimism: number): number {
@@ -96,9 +68,7 @@ export function upperConfidenceBound(input: UncertaintyInput, optimism: number):
  * How much of the estimate is still doubt, in [0, 1].
  *
  * Normalised against the widest a Beta posterior can be at this concentration
- * — the value at `p = 0.5` — so it reads as "how uncertain is this, relative to
- * the most uncertain it could be given this much evidence". Used for reporting
- * rather than for the decision itself, which uses the bound directly.
+ * (the value at `p = 0.5`). Reporting only; decisions use the bound directly.
  */
 export function relativeUncertainty(input: UncertaintyInput): number {
   const widest = posteriorStdDev({ probability: 0.5, concentration: input.concentration });

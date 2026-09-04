@@ -1,22 +1,16 @@
 /**
  * Calibration types (spec sections 41 and 44).
  *
- * Phase 10 made RoutePilot able to learn a success probability. This phase asks
- * the question that has to follow: **is that number any good?**
+ * Asks whether a learned probability is any good. Two failures need telling
+ * apart:
  *
- * The two failures are different and need telling apart:
+ * - **Miscalibration.** Says 90%, right 60% of the time. Ranking may be fine,
+ *   but the number cannot be believed -- and expected-cost multiplies by it.
+ * - **No discrimination.** Says 78% for everything and is right 78% of the
+ *   time. Perfectly calibrated and useless.
  *
- * - **Miscalibration.** The model says 90% and is right 60% of the time. The
- *   ranking may still be fine — it just cannot be believed as a probability,
- *   which matters enormously here because the expected-cost arithmetic
- *   multiplies by it.
- * - **No discrimination.** The model says 78% for everything and is right 78%
- *   of the time. Perfectly calibrated, and completely useless, because it
- *   cannot tell a task it will fail from one it will pass.
- *
- * A single number cannot express both, which is why the report below carries a
- * Brier score *and* its decomposition *and* a skill score against the base rate.
- * A predictor that fails either way must not be quietly trusted.
+ * No single number expresses both, so the report carries a Brier score, its
+ * decomposition, and a skill score against the base rate.
  */
 
 import type { TaskScope } from './features.js';
@@ -26,11 +20,8 @@ import type { TaskType } from './task.js';
 export const PREDICTION_SOURCES = ['prior', 'learned'] as const;
 
 /**
- * Where a prediction came from.
- *
- * Recorded per prediction so the two can be scored **separately**. Pooling them
- * would let well-calibrated priors disguise badly calibrated learned estimates,
- * which is precisely the failure this phase exists to catch.
+ * Where a prediction came from. Recorded per prediction so the two are scored
+ * separately: pooling would let good priors disguise bad learned estimates.
  */
 export type PredictionSource = (typeof PREDICTION_SOURCES)[number];
 
@@ -42,12 +33,7 @@ export interface PredictionRecord {
   readonly scope: TaskScope;
   /** The probability that was predicted, in [0, 1]. */
   readonly predicted: number;
-  /**
-   * What actually happened, in [0, 1].
-   *
-   * Fractional because success is multi-dimensional (Phase 8). A task that
-   * builds and lints but fails its tests is neither a 1 nor a 0.
-   */
+  /** What happened, in [0, 1]. Fractional: success is multi-dimensional. */
   readonly actual: number;
   readonly source: PredictionSource;
   /** Real observations behind the prediction when it was made. Never a pseudo-count. */
@@ -68,43 +54,35 @@ export interface CalibrationBin {
   /** Mean actual outcome in this bin, or `null` when the bin is empty. */
   readonly meanOutcome: number | null;
   /**
-   * Signed gap, `meanPrediction - meanOutcome`, or `null` when empty.
-   *
-   * Positive means over-confident. The sign matters: an over-confident router
-   * spends money on attempts that fail, while an under-confident one escalates
-   * to models it did not need. They are not the same problem.
+   * Signed gap, `meanPrediction - meanOutcome`, or `null` when empty. Positive
+   * is over-confident. The sign matters: over-confidence wastes money on
+   * attempts that fail, under-confidence escalates unnecessarily.
    */
   readonly gap: number | null;
 }
 
 /**
- * Calibration measured over a set of predictions.
- *
- * Every field is `null`-free except where a quantity genuinely cannot be
- * computed, and each is documented with the direction of "better", because a
- * metric whose direction the reader has to guess is a metric that will be
+ * Calibration measured over a set of predictions. Each metric documents the
+ * direction of "better", since one whose direction must be guessed gets
  * misread.
  */
 export interface CalibrationReport {
   /** Predictions scored. */
   readonly count: number;
-  /** Mean actual outcome — what "always guess the average" would predict. */
+  /** Mean actual outcome -- what "always guess the average" would predict. */
   readonly baseRate: number;
   /**
-   * Brier score: mean squared error of the probabilities. **Lower is better**,
+   * Brier score: mean squared error of the probabilities. **Lower is better**;
    * 0 is perfect, 0.25 is what a constant 0.5 scores on a balanced problem.
    */
   readonly brierScore: number;
   /**
    * Improvement over always predicting the base rate. **Higher is better.**
+   * Zero means no more useful than a constant; negative means worse. This is
+   * what catches a predictor that is well calibrated and tells you nothing.
    *
-   * Zero means the predictor is no more useful than a constant, and negative
-   * means it is actively worse. This is the metric that catches a predictor
-   * which is beautifully calibrated and tells you nothing.
-   *
-   * `null` when the base rate leaves no room to improve — every outcome
-   * identical — because dividing by a zero reference would manufacture a score
-   * out of nothing.
+   * `null` when every outcome is identical, since dividing by a zero reference
+   * would manufacture a score out of nothing.
    */
   readonly brierSkillScore: number | null;
   /**
@@ -113,20 +91,18 @@ export interface CalibrationReport {
    */
   readonly reliability: number;
   /**
-   * Resolution: how much predictions vary from the base rate.
-   * **Higher is better** — this is the discrimination a constant predictor
-   * lacks entirely.
+   * Resolution: how much predictions vary from the base rate. **Higher is
+   * better** -- the discrimination a constant predictor lacks entirely.
    */
   readonly resolution: number;
-  /** Uncertainty: the variance inherent in the outcomes. Not a quality measure. */
+  /** Uncertainty: variance inherent in the outcomes. Not a quality measure. */
   readonly uncertainty: number;
   /**
    * `brierScore - (reliability - resolution + uncertainty)`.
    *
    * The Murphy decomposition is exact only when predictions are constant within
-   * each bin; with ranged bins a within-bin spread term remains. Reporting it
-   * rather than hiding it means the decomposition can be checked instead of
-   * trusted.
+   * each bin; with ranged bins a within-bin spread term remains. Reported so it
+   * can be checked rather than trusted.
    */
   readonly decompositionResidual: number;
   /**
@@ -135,17 +111,15 @@ export interface CalibrationReport {
    */
   readonly expectedCalibrationError: number;
   /**
-   * Maximum calibration error: the worst single bin gap. **Lower is better.**
-   *
-   * Reported alongside ECE because a predictor can look fine on average while
-   * being badly wrong in exactly the high-confidence range that routing acts on.
+   * Worst single bin gap. **Lower is better.** Reported alongside ECE because a
+   * predictor can look fine on average while being badly wrong in exactly the
+   * high-confidence range routing acts on.
    */
   readonly maximumCalibrationError: number;
   /**
-   * Signed mean error, `mean(predicted) - mean(actual)`.
-   *
-   * Positive is over-confident overall. Unlike ECE this does not cancel across
-   * bins into a flattering number by accident — it is the systematic direction.
+   * Signed mean error, `mean(predicted) - mean(actual)`. Positive is
+   * over-confident. Unlike ECE this cannot cancel across bins into a flattering
+   * number.
    */
   readonly bias: number;
   /** The reliability diagram, coarsest bound first. Empty bins included. */
@@ -163,11 +137,9 @@ export interface CalibrationThresholds {
   /** Smallest acceptable improvement over the base rate. */
   readonly minimumBrierSkillScore: number;
   /**
-   * Whether a predictor must be *proved* well calibrated before it is used.
-   *
-   * False by default: an unassessed predictor is governed by Phase 10's own
-   * training minimum. True demands positive evidence, which is the right
-   * setting where a wrong route is expensive.
+   * Whether a predictor must be proved well calibrated before use. False by
+   * default, leaving an unassessed predictor to the training minimum; true
+   * demands positive evidence, which suits expensive mistakes.
    */
   readonly requireCalibration: boolean;
 }
@@ -176,12 +148,9 @@ export interface CalibrationThresholds {
 export const CALIBRATION_STATUSES = ['trusted', 'unassessed', 'distrusted'] as const;
 
 /**
- * How much a predictor may be believed.
- *
- * Three states, not two, because "not yet measured" is not "bad" — the same
- * absent-is-not-zero rule that governs outcomes governs calibration itself. A
- * predictor with nine predictions to its name has not failed; it has not been
- * examined.
+ * How much a predictor may be believed. Three states, because "not yet
+ * measured" is not "bad" -- the absent-is-not-zero rule applies to calibration
+ * itself.
  */
 export type CalibrationStatus = (typeof CALIBRATION_STATUSES)[number];
 
@@ -204,10 +173,8 @@ export interface PredictionStore {
   /** Append prediction records. */
   recordPredictions(records: readonly PredictionRecord[]): void;
   /**
-   * Load recent predictions, newest first.
-   *
-   * `source` narrows to one kind, because pooling priors with learned estimates
-   * would hide exactly the miscalibration this phase looks for.
+   * Load recent predictions, newest first. `source` narrows to one kind,
+   * because pooling would hide the miscalibration this exists to find.
    */
   loadPredictions(limit: number, source?: PredictionSource): readonly PredictionRecord[];
 }

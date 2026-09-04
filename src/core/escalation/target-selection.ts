@@ -1,35 +1,28 @@
 /**
  * Which model a vertical escalation moves to.
  *
- * One rule, used by both the thing that *predicts* an escalation and the thing
- * that *performs* one. They disagreed until Phase 25:
+ * One rule, used by both the code that predicts an escalation and the code that
+ * performs one. They previously disagreed:
  *
- * | | estimator (`cost-estimator.ts`) | engine (`escalation-engine.ts`) |
+ * | | estimator | engine |
  * | --- | --- | --- |
  * | "stronger" means | `p > current` | `p > current + 0.02` |
- * | ranked by | lowest expected total cost | lowest `pricing.outputPerMillion` |
+ * | ranked by | lowest expected total cost | lowest `outputPerMillion` |
  * | already-tried models | included | excluded |
  *
- * The ranking difference is the one that mattered. `expected-cost.ts` exists to
- * argue that the cheapest sticker price is a trap — a model that costs less per
- * token and fails more often is the more expensive path — and the escalation
- * engine picked its target by sticker price. So RoutePilot would tell a user
- * "escalates to X" while the runtime moved to Y, and the number attached to X
- * was the justification for choosing the model in the first place.
+ * The ranking mattered most. `expected-cost.ts` exists to argue that the
+ * cheapest sticker price is a trap, yet the engine picked its target by sticker
+ * price -- so RoutePilot would report "escalates to X" while the runtime moved
+ * to Y, having justified the original choice with X's number.
  *
- * This module is that rule, once. The estimator's own recovery *pricing* stays
- * where it is; only target selection is shared.
+ * Only target selection is shared; the estimator's recovery pricing stays put.
  *
- * ## What is deliberately not unified
- *
- * The engine tries a **horizontal** move first for `MODEL_WEAKNESS`, and only
- * `MODEL_WEAKNESS` reaches a vertical escalation at all — every other failure
- * type retries, asks, changes provider, or stops. The estimator models none of
- * that: it applies one retry/escalate split to every failure. Closing that gap
- * means giving the estimator a distribution over failure types, which is a
- * design change rather than a correctness fix, and it is left open on purpose.
- * The direction of the remaining error is conservative: the estimate prices the
- * vertical path, and the engine may take a cheaper sideways one.
+ * Deliberately not unified: the engine tries a horizontal move first for
+ * `MODEL_WEAKNESS`, and only `MODEL_WEAKNESS` escalates vertically at all,
+ * while the estimator applies one retry/escalate split to every failure.
+ * Closing that needs a distribution over failure types -- a design change, not
+ * a correctness fix. The remaining error is conservative: the estimate prices
+ * the vertical path, and the engine may take a cheaper sideways one.
  */
 
 import type { ModelSpec } from '../types/model.js';

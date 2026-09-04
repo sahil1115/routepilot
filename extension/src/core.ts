@@ -1,33 +1,27 @@
 /**
  * Loading the RoutePilot core from a CommonJS extension.
  *
- * The core is ESM ("type": "module"); the VS Code extension host loads
- * extensions as CommonJS. A CommonJS module cannot require() an ES module, so
- * the bridge is a dynamic import() -- which Node supports from CommonJS, and
+ * The core is ESM; the VS Code extension host loads extensions as CommonJS, and
+ * CommonJS cannot require() an ES module. The bridge is a dynamic import(),
  * which TypeScript preserves under `module: Node16` rather than downlevelling
  * into a `require` that would fail at runtime.
  *
- * The core is loaded from `extension/dist/`, the extension's **own copy**,
- * populated by `npm run build:extension`. Reaching up into the repository would
- * work on a developer's machine and fail for everyone who installs the `.vsix`,
- * because a `.vsix` is a self-contained archive.
+ * The core is loaded from `extension/dist/`, the extension's own copy, built by
+ * `npm run build:extension`. Reaching up into the repository would work on a
+ * developer machine and fail for anyone installing the `.vsix`, which is a
+ * self-contained archive.
  *
- * The imports are **typed against the real build**, not against a hand-written
- * interface. An interface describing the core loosely would compile happily
- * while drifting out of step with it, and the drift would only show up as a
- * runtime failure inside an extension host that cannot be tested here -- the
- * one place a mistake is most expensive. Pointing at `dist/` means a signature
- * change in the core breaks this file at compile time instead.
+ * The imports are typed against that real build rather than a hand-written
+ * interface, which would compile happily while drifting out of step and surface
+ * only as a runtime failure inside an extension host. Pointing at `dist/` turns
+ * a core signature change into a compile error here.
  *
- * The import is lazy and cached: activation cost is charged to the user's
- * window start-up, and an extension that routes nothing until asked has no
- * business spending it.
+ * The import is lazy and cached, so activation costs the user's window
+ * start-up nothing until something is actually routed.
  *
- * Each `typeof import(...)` carries an inline `resolution-mode` attribute.
- * Without it a CommonJS file cannot describe the shape of an ES module at all
- * (`TS1542`), and TypeScript does not accept the attribute through a type
- * alias. Nothing here is emitted; it only tells the compiler to resolve `dist/`
- * the way Node will at runtime.
+ * Each `typeof import(...)` carries an inline `resolution-mode` attribute:
+ * without it a CommonJS file cannot describe an ES module at all (TS1542), and
+ * TypeScript does not accept the attribute through a type alias.
  */
 
 /** The core modules this extension uses, as they actually are. */

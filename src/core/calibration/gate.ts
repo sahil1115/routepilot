@@ -1,51 +1,25 @@
 /**
  * The calibration safeguard (spec sections 41 and 44).
  *
- * "Do not activate poorly calibrated predictions without safeguards." This is
- * the safeguard: it stands between the learned model of Phase 10 and the
- * routing engine, and it can switch learning off on evidence.
+ * Stands between the learned model and the routing engine, and can switch
+ * learning off on evidence. Three states, because a predictor with nine
+ * predictions has not failed -- it has not been examined:
  *
- * ## Three states, not two
+ * - `trusted` -- measured, within every threshold.
+ * - `unassessed` -- too few predictions to judge; the training minimum governs.
+ * - `distrusted` -- measured and outside a threshold. Priors are restored.
  *
- * A predictor with nine predictions to its name has not failed — it has not
- * been examined, and the difference is the whole of absent-is-not-zero applied
- * to calibration itself:
+ * The default distrusts on evidence rather than demanding proof first, because
+ * proof-first deadlocks: predictions are generated only while learning is
+ * active. Operators who prefer a worse route to an unproven one set
+ * `requireCalibration`, and then `unassessed` blocks too.
  *
- * - **`trusted`** — measured, and within every threshold.
- * - **`unassessed`** — too few predictions to judge. Phase 10's own training
- *   minimum still governs, and nothing here overrides it.
- * - **`distrusted`** — measured, and demonstrably outside a threshold. Learning
- *   is suppressed and the configured priors are restored.
- *
- * ## Why the default is "distrust on evidence" rather than "prove it first"
- *
- * Requiring proof before activation is a deadlock: predictions are only
- * generated while learning is active, so a predictor that must be proved
- * calibrated before it may be used can never generate the evidence to prove it.
- *
- * The default therefore lets an unassessed predictor run under Phase 10's
- * gate and withdraws it the moment the evidence says it is wrong. Operators who
- * would rather pay for a worse route than an unproven one set
- * `requireCalibration`, and then `unassessed` blocks too. Both paths are
- * tested.
- *
- * ## What "poorly calibrated" means here
- *
- * Four ways to fail, because one number cannot catch them all:
- *
- * 1. **Expected calibration error** too high — the probabilities are wrong on
- *    average.
- * 2. **Maximum calibration error** too high — they are wrong somewhere
- *    specific, which an average can hide, and routing acts hardest in exactly
- *    the high-confidence range where it matters most.
- * 3. **Brier skill score** too low — the predictor explains too little of the
- *    outcome variance to be worth consulting. This is what catches the
- *    predictor that answers 0.78 to everything: perfectly calibrated by every
- *    other measure here, and useless. The floor is deliberately **above zero**,
- *    because a skill score of exactly zero *is* that predictor.
- * 4. **Systematic over-confidence** — a signed bias that ECE cannot express,
- *    and the direction that actually costs money, because it spends on attempts
- *    that fail.
+ * Four ways to fail, since one number cannot catch them all: expected
+ * calibration error (wrong on average); maximum calibration error (wrong
+ * somewhere specific, which an average hides); Brier skill score (explains too
+ * little variance -- this catches the predictor that answers 0.78 to
+ * everything, so the floor sits above zero); and systematic over-confidence,
+ * the signed bias ECE cannot express and the direction that costs money.
  */
 
 import type {
