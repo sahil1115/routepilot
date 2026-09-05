@@ -1,6 +1,6 @@
 {
   "name": "routepilot",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "description": "RoutePilot â€” choose the cheapest path to success. An intelligent coding-agent model router.",
   "author": "Sahil",
