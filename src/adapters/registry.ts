@@ -159,14 +159,20 @@ export class AgentRegistry {
    * A preferred adapter wins if it can handle the request and is available.
    * Otherwise adapters are tried in id order, and every rejection is recorded
    * so the caller can explain what happened.
+   *
+   * `allowFallback: false` restricts selection to the preferred adapter. It only
+   * means something relative to a preference, so with no `preferredAdapterId`
+   * there is nothing to fall back *from* and every adapter stays in play.
    */
   async select(
     request: AgentExecutionRequest,
     options: { preferredAdapterId?: string | undefined; allowFallback?: boolean | undefined } = {},
   ): Promise<AdapterSelection> {
     const rejected: AdapterRejection[] = [];
+    const allowFallback = options.allowFallback ?? true;
+    const restricted = !allowFallback && options.preferredAdapterId !== undefined;
 
-    const ordered = this.#candidateOrder(options.preferredAdapterId);
+    const ordered = this.#candidateOrder(options.preferredAdapterId, allowFallback);
 
     if (options.preferredAdapterId !== undefined && !this.has(options.preferredAdapterId)) {
       rejected.push({
@@ -175,12 +181,17 @@ export class AgentRegistry {
       });
     }
 
+    // Without this the caller is told only that one adapter was unavailable,
+    // and not that others existed but were deliberately excluded.
+    const note = (reason: string): string =>
+      restricted ? `${reason} (fallback to another adapter was disabled)` : reason;
+
     for (const adapter of ordered) {
       const decision = adapter.canHandle(request);
       if (!decision.supported) {
         rejected.push({
           adapterId: adapter.id,
-          reason: decision.reason ?? 'cannot handle this request',
+          reason: note(decision.reason ?? 'cannot handle this request'),
         });
         continue;
       }
@@ -189,7 +200,7 @@ export class AgentRegistry {
       if (!status.available) {
         rejected.push({
           adapterId: adapter.id,
-          reason: status.detail ?? 'not available',
+          reason: note(status.detail ?? 'not available'),
         });
         continue;
       }
@@ -274,13 +285,20 @@ export class AgentRegistry {
     };
   }
 
-  /** Preferred adapter first, then the rest in deterministic id order. */
-  #candidateOrder(preferredAdapterId: string | undefined): AgentAdapter[] {
+  /**
+   * Preferred adapter first, then the rest in deterministic id order.
+   *
+   * With `allowFallback: false` the rest are omitted entirely -- including when
+   * the preferred id is not registered at all, where returning every adapter
+   * would let a typo run the request somewhere the caller never named.
+   */
+  #candidateOrder(preferredAdapterId: string | undefined, allowFallback: boolean): AgentAdapter[] {
     const all = this.list();
     if (preferredAdapterId === undefined) return all;
 
     const preferred = this.#adapters.get(preferredAdapterId);
-    if (preferred === undefined) return all;
+    if (preferred === undefined) return allowFallback ? all : [];
+    if (!allowFallback) return [preferred];
 
     return [preferred, ...all.filter((adapter) => adapter.id !== preferredAdapterId)];
   }

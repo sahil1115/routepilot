@@ -10,6 +10,10 @@
  * handling that keeps the secret out of every log line, error message and
  * thrown object (sections 20, 34 and 51).
  *
+ * Streaming is incremental where the injected client exposes a response body,
+ * which the global `fetch` does. A fake supplying only `text()` falls back to
+ * buffering -- correct, but the whole response arrives at once.
+ *
  * The vendor-specific half is a {@link ProviderProtocol} supplied by the
  * caller. No concrete protocol ships yet, and `verification.ts` records this
  * adapter as unverified for that reason.
@@ -67,6 +71,15 @@ export type FetchLike = (
   status: number;
   statusText: string;
   text(): Promise<string>;
+  /**
+   * The response body, when the client exposes one.
+   *
+   * Optional because a caller may inject a fake that only implements `text()`.
+   * When it is absent the adapter buffers, which is correct but not streaming;
+   * when it is present events reach the caller as chunks arrive. The global
+   * `fetch` supplies it, so real use streams.
+   */
+  body?: AsyncIterable<Uint8Array> | ReadableStream<Uint8Array> | null | undefined;
 }>;
 
 /** Options for {@link DirectProviderAdapter}. */
@@ -176,13 +189,19 @@ export class DirectProviderAdapter implements AgentAdapter {
 
     const encoded = this.#protocol.encodeRequest(request, model);
     const chunks: string[] = [];
-    const events: AgentEvent[] = [];
+    const queue = new EventQueue();
     let failure: AgentResult | null = null;
 
     const work = (async (): Promise<void> => {
+      // Asked before the request, not inferred from its rejection. A missing
+      // credential would otherwise reach the provider, come back 401, and be
+      // classified PROVIDER_FAILURE -- blaming the provider for a local
+      // configuration problem, and feeding that to escalation and learning
+      // (spec section 22).
+      const status = await this.getStatus();
       const endpoint = this.#provider.endpoint;
-      if (endpoint === undefined) {
-        failure = this.#environmentFailure('no endpoint is configured');
+      if (!status.available || endpoint === undefined) {
+        failure = this.#environmentFailure(status.detail ?? 'no endpoint is configured');
         return;
       }
 
@@ -194,6 +213,13 @@ export class DirectProviderAdapter implements AgentAdapter {
         controller.abort();
       }, this.#provider.timeoutMs);
 
+      const emit = (line: string): void => {
+        if (line.trim() === '') return;
+        chunks.push(line);
+        const event = this.#protocol.decodeEvent(line);
+        if (event !== null) queue.push(event);
+      };
+
       try {
         const response = await this.#fetch(joinUrl(endpoint, encoded.path), {
           method: encoded.method,
@@ -202,14 +228,14 @@ export class DirectProviderAdapter implements AgentAdapter {
           signal: controller.signal,
         });
 
-        const text = await response.text();
-
         if (!response.ok) {
+          // Drained so the connection can be reused. Never shown: a provider's
+          // error body can echo the request.
+          await response.text().catch(() => undefined);
           failure = {
             status: 'failed',
             changedFiles: [],
             failureType: 'PROVIDER_FAILURE',
-            // Redacted: a provider's error body can echo the request.
             errorSummary: this.#redact(
               `provider responded ${String(response.status)} ${response.statusText}`,
             ),
@@ -217,12 +243,27 @@ export class DirectProviderAdapter implements AgentAdapter {
           return;
         }
 
-        for (const line of text.split('\n')) {
-          if (line.trim() === '') continue;
-          chunks.push(line);
-          const event = this.#protocol.decodeEvent(line);
-          if (event !== null) events.push(event);
+        const body = response.body;
+        if (body === undefined || body === null) {
+          // No stream to read: buffer, which is what an injected fake with only
+          // `text()` gives us.
+          for (const line of (await response.text()).split('\n')) emit(line);
+          return;
         }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for await (const bytes of iterateBody(body)) {
+          buffer += decoder.decode(bytes, { stream: true });
+          let newline = buffer.indexOf('\n');
+          while (newline !== -1) {
+            emit(buffer.slice(0, newline).replace(/\r$/, ''));
+            buffer = buffer.slice(newline + 1);
+            newline = buffer.indexOf('\n');
+          }
+        }
+        // A final line without a trailing newline is still a line.
+        emit(buffer + decoder.decode());
       } catch (error) {
         failure = controller.signal.aborted
           ? {
@@ -243,12 +284,16 @@ export class DirectProviderAdapter implements AgentAdapter {
       }
     })();
 
-    const stream: AsyncIterable<AgentEvent> = {
-      async *[Symbol.asyncIterator](): AsyncIterator<AgentEvent> {
-        await work;
-        for (const event of events) yield event;
-      },
-    };
+    // Closed however `work` ends -- returned, threw, or was cancelled -- so a
+    // consumer iterating events is never left waiting on a dead request.
+    void work.finally(() => {
+      queue.close();
+    });
+
+    // Deliberately not `await work` before the first yield: that single line
+    // was what made this buffer, by refusing to hand over anything until the
+    // whole response had arrived.
+    const stream: AsyncIterable<AgentEvent> = queue;
 
     const result = (async (): Promise<AgentResult> => {
       await work;
@@ -327,4 +372,78 @@ export class DirectProviderAdapter implements AgentAdapter {
 function joinUrl(base: string, path: string): string {
   if (path === '') return base;
   return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+/**
+ * Iterate a response body, whichever shape the client gave us.
+ *
+ * Node's `fetch` returns a web `ReadableStream`, which is async-iterable on
+ * Node and not in every browser build, so the reader path is kept as a
+ * fallback rather than assumed away.
+ */
+async function* iterateBody(
+  body: AsyncIterable<Uint8Array> | ReadableStream<Uint8Array>,
+): AsyncGenerator<Uint8Array> {
+  // Probed rather than narrowed with `in`: this lib declares ReadableStream as
+  // async-iterable too, so `in` narrows the alternative to `never`.
+  const candidate = body as Partial<AsyncIterable<Uint8Array>> & ReadableStream<Uint8Array>;
+  if (typeof candidate[Symbol.asyncIterator] === 'function') {
+    yield* candidate as AsyncIterable<Uint8Array>;
+    return;
+  }
+
+  const reader = candidate.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      if (value !== undefined) yield value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+/**
+ * Events, yielded as they are produced.
+ *
+ * The same shape as `LineQueue` in the process runner, for the same reason: a
+ * consumer must be able to see an event before the producer has finished.
+ */
+class EventQueue implements AsyncIterable<AgentEvent> {
+  #pending: AgentEvent[] = [];
+  #closed = false;
+  #notify: (() => void) | null = null;
+
+  push(event: AgentEvent): void {
+    if (this.#closed) return;
+    this.#pending.push(event);
+    this.#wake();
+  }
+
+  close(): void {
+    if (this.#closed) return;
+    this.#closed = true;
+    this.#wake();
+  }
+
+  #wake(): void {
+    const notify = this.#notify;
+    this.#notify = null;
+    notify?.();
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterator<AgentEvent> {
+    for (;;) {
+      const next = this.#pending.shift();
+      if (next !== undefined) {
+        yield next;
+        continue;
+      }
+      if (this.#closed) return;
+      await new Promise<void>((resolve) => {
+        this.#notify = resolve;
+      });
+    }
+  }
 }

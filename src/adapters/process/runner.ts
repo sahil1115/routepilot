@@ -54,6 +54,13 @@ export interface RunOptions {
   readonly maxOutputBytes?: number | undefined;
   /** Text written to the child's stdin, if any. */
   readonly stdin?: string | undefined;
+  /**
+   * Grace period between SIGTERM and SIGKILL. Defaults to 2000.
+   *
+   * Injectable so a test does not have to wait two seconds to observe the
+   * escalation.
+   */
+  readonly killEscalationMs?: number | undefined;
 }
 
 /** A running child process. */
@@ -86,6 +93,11 @@ export function runProcess(options: RunOptions): RunHandle {
   let settled = false;
   let cancelled = false;
   let timedOut = false;
+  // Whether the child has actually gone. `child.killed` answers a different
+  // question -- "was a signal sent" -- and is true the instant SIGTERM leaves,
+  // long before the process reacts to it.
+  let exited = false;
+  let escalation: ReturnType<typeof setTimeout> | null = null;
 
   let child: ChildProcessWithoutNullStreams | null = null;
   let resolveResult: (result: RunResult) => void = () => undefined;
@@ -116,12 +128,15 @@ export function runProcess(options: RunOptions): RunHandle {
   timer.unref?.();
 
   function kill(): void {
-    if (child === null || child.killed) return;
+    // De-duplicated on the escalation timer rather than on `child.killed`:
+    // guarding on `killed` here would make every call after the first a no-op,
+    // which is correct, but reading it inside the escalation below never was.
+    if (child === null || exited || escalation !== null) return;
     child.kill('SIGTERM');
     // If it ignores SIGTERM, escalate. Unref'd so it cannot delay exit.
-    const escalation = setTimeout(() => {
-      if (child !== null && !child.killed) child.kill('SIGKILL');
-    }, 2_000);
+    escalation = setTimeout(() => {
+      if (!exited) child?.kill('SIGKILL');
+    }, options.killEscalationMs ?? 2_000);
     escalation.unref?.();
   }
 
@@ -150,7 +165,10 @@ export function runProcess(options: RunOptions): RunHandle {
 
   process_.stdout.setEncoding('utf8');
   process_.stdout.on('data', (chunk: string) => {
-    if (queue.bytes + chunk.length > maxOutputBytes) {
+    // Byte length, not string length. The stream is decoded to UTF-16, where a
+    // three-byte character counts as one -- so a cap named in bytes would let
+    // multibyte output use several times the memory it was allowed.
+    if (queue.bytes + Buffer.byteLength(chunk, 'utf8') > maxOutputBytes) {
       truncated = true;
       kill();
       return;
@@ -160,15 +178,18 @@ export function runProcess(options: RunOptions): RunHandle {
 
   process_.stderr.setEncoding('utf8');
   process_.stderr.on('data', (chunk: string) => {
-    if (stderrBytes + chunk.length > maxOutputBytes) {
+    const bytes = Buffer.byteLength(chunk, 'utf8');
+    if (stderrBytes + bytes > maxOutputBytes) {
       truncated = true;
       return;
     }
-    stderrBytes += chunk.length;
+    stderrBytes += bytes;
     stderr += chunk;
   });
 
   process_.on('close', (code, signal) => {
+    exited = true;
+    if (escalation !== null) clearTimeout(escalation);
     if (cancelled) finish('cancelled', code, signal);
     else if (timedOut) finish('timed-out', code, signal);
     else finish('exited', code, signal);
@@ -208,7 +229,7 @@ class LineQueue implements AsyncIterable<string> {
 
   push(chunk: string): void {
     if (this.#closed) return;
-    this.bytes += chunk.length;
+    this.bytes += Buffer.byteLength(chunk, 'utf8');
     this.#buffer += chunk;
 
     let newline = this.#buffer.indexOf('\n');

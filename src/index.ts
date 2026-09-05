@@ -27,11 +27,10 @@ export const TAGLINE = 'Choose the cheapest path to success.' as const;
  * silently became "unknown" in the artefact people actually install would be
  * worse than one that cannot drift.
  *
- * 0.x rather than 1.0.0 deliberately. One adapter has now run against a real
- * model, and the VS Code extension is verified in a real host — but Cursor and
- * the direct HTTP adapter remain unverified, and only a trivial tool-free task
- * has been executed. A major version would claim more than that. A major version would claim a
- * stability this has not earned.
+ * 0.x rather than 1.0.0 deliberately. Both coding-agent adapters now pass real
+ * coding tasks and the VS Code extension is verified in a real host, but the
+ * direct HTTP adapter has never been given a credential. A major version would
+ * claim a stability this has not earned.
  */
 export const VERSION = '0.6.1' as const;
 

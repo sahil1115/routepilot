@@ -108,6 +108,74 @@ describe('process runner', () => {
     expect(result.stderr).toContain('boom');
   });
 
+  it('counts the output cap in bytes, not characters', async () => {
+    // The cap is named in bytes and was measured with `String.length`, which
+    // counts UTF-16 units. Ten three-byte characters read as ten, so output
+    // three times over the limit was accepted and the memory cap did not hold.
+    const cli = await stub({ stdout: ['€'.repeat(10)] });
+
+    const handle = runProcess({
+      command: cli.command,
+      args: [...cli.commandArgs],
+      cwd: cli.dir,
+      timeoutMs: 30_000,
+      // Above the 10-character count, below the 30-byte reality.
+      maxOutputBytes: 20,
+    });
+
+    for await (const line of handle.lines) void line;
+    const result = await handle.result;
+
+    expect(result.truncated).toBe(true);
+  });
+
+  it('does not truncate output that genuinely fits', async () => {
+    // The positive control: counting bytes must not make the cap fire early.
+    const cli = await stub({ stdout: ['abcdefghij'] });
+
+    const handle = runProcess({
+      command: cli.command,
+      args: [...cli.commandArgs],
+      cwd: cli.dir,
+      timeoutMs: 30_000,
+      maxOutputBytes: 20,
+    });
+
+    const lines: string[] = [];
+    for await (const line of handle.lines) lines.push(line);
+    const result = await handle.result;
+
+    expect(result.truncated).toBe(false);
+    expect(lines).toEqual(['abcdefghij']);
+  });
+
+  // Windows has no ignorable SIGTERM -- `child.kill` terminates unconditionally
+  // -- so the escalation cannot be provoked there. Skipped rather than adjusted
+  // to pass, because a test that cannot exercise the path should not claim to.
+  it.skipIf(process.platform === 'win32')(
+    'escalates to SIGKILL when a process ignores SIGTERM',
+    async () => {
+      // `child.killed` is true the moment SIGTERM is *sent*, so the escalation
+      // guard `!child.killed` was never satisfied and SIGKILL was never reached.
+      // Before the fix this test hangs: the process survives and never closes.
+      const cli = await stub({ stdout: ['started'], hang: true, ignoreSigterm: true });
+
+      const handle = runProcess({
+        command: cli.command,
+        args: [...cli.commandArgs],
+        cwd: cli.dir,
+        timeoutMs: 300,
+        killEscalationMs: 200,
+      });
+
+      for await (const line of handle.lines) void line;
+      const result = await handle.result;
+
+      expect(result.outcome).toBe('timed-out');
+    },
+    15_000,
+  );
+
   it('times out a hanging process rather than waiting forever', async () => {
     const cli = await stub({ stdout: ['started'], hang: true });
 
@@ -597,6 +665,112 @@ describe('direct provider adapter', () => {
     expect((await session.result).status).toBe('completed');
   });
 
+  it('delivers events as chunks arrive, not after the response completes', async () => {
+    // The defect: `execute` awaited `response.text()` and the session iterator
+    // did `await work` before its first yield, so nothing reached the caller
+    // until the whole response had landed -- while `capabilities.streaming`
+    // advertised the opposite.
+    let releaseSecond = (): void => undefined;
+    const secondChunk = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+
+    const streamingFetch: FetchLike = () =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: () => Promise.resolve(''),
+        body: (async function* () {
+          yield new TextEncoder().encode('event: one\n');
+          await secondChunk;
+          yield new TextEncoder().encode('event: two\n');
+        })(),
+      });
+
+    const adapter = new DirectProviderAdapter({
+      provider,
+      protocol,
+      env: { ACME_TEST_KEY: 'secret' },
+      fetch: streamingFetch,
+    });
+
+    const session = await adapter.execute(request({ requiredCapabilities: {} }), model);
+    const iterator = session.events[Symbol.asyncIterator]();
+
+    // The decisive assertion: this resolves while the response is still open.
+    // Before the fix it deadlocks, because nothing is yielded until `work`
+    // finishes and `work` cannot finish until the test releases the chunk.
+    const first = await iterator.next();
+    if (first.done !== false) throw new Error('no event arrived before the response completed');
+    expect(first.value.kind).toBe('assistant-message');
+
+    releaseSecond();
+
+    const second = await iterator.next();
+    expect(second.done).toBe(false);
+    expect((await iterator.next()).done).toBe(true);
+    expect((await session.result).status).toBe('completed');
+  });
+
+  it('reads a ReadableStream body as well as an async iterable', async () => {
+    // Node's global fetch returns a web ReadableStream. Covered separately so
+    // the reader path is not left to a runtime that happens to be iterable.
+    const readable = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('event: one\nevent'));
+        controller.enqueue(new TextEncoder().encode(': two\n'));
+        controller.close();
+      },
+    });
+
+    const adapter = new DirectProviderAdapter({
+      provider,
+      protocol,
+      env: { ACME_TEST_KEY: 'secret' },
+      fetch: () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          text: () => Promise.resolve(''),
+          body: readable,
+        }),
+    });
+
+    const session = await adapter.execute(request({ requiredCapabilities: {} }), model);
+
+    // Two events despite the second arriving split across chunk boundaries.
+    expect(await collect(session.events)).toHaveLength(2);
+  });
+
+  it('classifies a missing credential as an environment failure, without sending', async () => {
+    // A missing environment variable is a local configuration problem. Sending
+    // anyway earned a 401 and a PROVIDER_FAILURE, which blames the provider --
+    // and feeds escalation and learning a failure the model never caused.
+    let called = false;
+    const shouldNotRun: FetchLike = () => {
+      called = true;
+      return Promise.reject(new Error('the request should never have been sent'));
+    };
+
+    const adapter = new DirectProviderAdapter({
+      provider,
+      protocol,
+      env: {},
+      fetch: shouldNotRun,
+    });
+
+    const session = await adapter.execute(request({ requiredCapabilities: {} }), model);
+    const result = await session.result;
+
+    expect(called).toBe(false);
+    expect(result.failureType).toBe('ENVIRONMENT_FAILURE');
+    expect(result.failureType).not.toBe('PROVIDER_FAILURE');
+    // The variable's name, so the fix is obvious. Never its value.
+    expect(result.errorSummary).toContain('ACME_TEST_KEY');
+  });
+
   it('sends the credential as a header and never in the body', async () => {
     let seenHeaders: Record<string, string> = {};
     const capturing: FetchLike = (_url, init) => {
@@ -718,6 +892,73 @@ describe('agent registry', () => {
       adapterId: 'broken',
       reason: 'the tool is not installed',
     });
+  });
+
+  it('does not fall back to another adapter when fallback is disabled', async () => {
+    // `allowFallback` was accepted by `select` and never read, so an explicitly
+    // restricted run could execute somewhere the caller had not named.
+    const broken = new FakeAgentAdapter({
+      id: 'broken',
+      script: { unavailable: 'the tool is not installed' },
+    });
+    const working = new FakeAgentAdapter({ id: 'working' });
+    const registry = new AgentRegistry([broken, working]);
+
+    const selection = await registry.select(request(), {
+      preferredAdapterId: 'broken',
+      allowFallback: false,
+    });
+
+    expect(selection.adapter).toBeNull();
+    expect(selection.rejected).toHaveLength(1);
+    expect(selection.rejected[0]?.adapterId).toBe('broken');
+    // The caller has to be able to tell "nothing worked" from "I forbade it".
+    expect(selection.rejected[0]?.reason).toContain('fallback');
+  });
+
+  it('still falls back when fallback is allowed', async () => {
+    // The positive control. Without it the fix above could be a blanket refusal
+    // and every one of these assertions would still pass.
+    const broken = new FakeAgentAdapter({ id: 'broken', script: { unavailable: 'missing' } });
+    const working = new FakeAgentAdapter({ id: 'working' });
+    const registry = new AgentRegistry([broken, working]);
+
+    const selection = await registry.select(request(), {
+      preferredAdapterId: 'broken',
+      allowFallback: true,
+    });
+
+    expect(selection.adapter?.id).toBe('working');
+  });
+
+  it('does not silently run elsewhere when a restricted preferred id is unknown', async () => {
+    // A typo must not become an execution on an adapter nobody asked for.
+    const working = new FakeAgentAdapter({ id: 'working' });
+    const registry = new AgentRegistry([working]);
+
+    const selection = await registry.select(request(), {
+      preferredAdapterId: 'typo',
+      allowFallback: false,
+    });
+
+    expect(selection.adapter).toBeNull();
+    expect(selection.rejected[0]?.reason).toContain('is registered');
+  });
+
+  it('execute honours allowFallback, not just select', async () => {
+    // `execute` computed the flag and handed it to `select`, which dropped it.
+    // Asserted through the public path so the wiring is covered too.
+    const broken = new FakeAgentAdapter({ id: 'broken', script: { unavailable: 'missing' } });
+    const working = new FakeAgentAdapter({ id: 'working' });
+    const registry = new AgentRegistry([broken, working]);
+
+    const outcome = await registry.execute(request(), model, {
+      preferredAdapterId: 'broken',
+      allowFallback: false,
+    });
+
+    expect(outcome.adapterId).toBeNull();
+    expect(outcome.result.failureType).toBe('ENVIRONMENT_FAILURE');
   });
 
   it('falls back when an adapter cannot provide a required capability', async () => {

@@ -119,7 +119,6 @@ export async function createStubCommand(behaviour: StubBehaviour): Promise<StubC
   return createStubCli(behaviour);
 }
 
-/** A plausible Claude Code stream-json transcript for a successful run. */
 /**
  * A run Claude Code blocked on permissions.
  *
