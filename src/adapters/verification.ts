@@ -62,10 +62,9 @@ export interface AdapterVerification {
  * against the filesystem rather than the transcript. Claude Code passes all
  * four only when a permission mode is set; see its limitations.
  *
- * `direct-provider` is not verified: it has never been given a credential. It
- * is covered by tests that drive real child processes, which proves it handles
- * the shapes it was told to expect, not that those are the shapes the tool
- * emits.
+ * `direct-provider` joined them on 2026-09-06 against the Anthropic Messages
+ * API. That verifies the transport and one vendor mapping; every other provider
+ * still needs its own `ProviderProtocol`, and none ships.
  */
 export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   {
@@ -171,19 +170,46 @@ export const ADAPTER_VERIFICATION: readonly AdapterVerification[] = [
   },
   {
     adapterId: 'direct-provider',
-    status: 'unverified',
+    status: 'verified',
     mechanism:
       'Generic HTTP transport with configurable endpoint, auth, timeout and retry ' +
       '(spec section 20). Request and response encoding is supplied per provider by a ' +
-      'ProviderProtocol, so no vendor API shape is assumed.',
+      'ProviderProtocol, so no vendor API shape is assumed. `anthropicMessagesProtocol` ' +
+      'is the first concrete one: POST /v1/messages, anthropic-version 2023-06-01, ' +
+      'streamed as server-sent events.',
     howToVerify:
-      'Supply a concrete ProviderProtocol and credentials, then run: ' +
-      'npm run verify:adapters -- direct-provider',
+      'Set the credential in your own shell -- never as an argument -- and run: ' +
+      'npm run verify:direct',
+    evidence: {
+      date: '2026-09-06',
+      toolVersion: 'anthropic-version 2023-06-01',
+      note:
+        'All four checks passed against https://api.anthropic.com on Windows, Node ' +
+        '22.18.0, calling claude-opus-5. A real streamed request completed in 2156 ms ' +
+        'reporting 16 input / 4 output tokens, with observed event kinds usage, ' +
+        'assistant-message, completed. A missing credential was refused locally as ' +
+        'ENVIRONMENT_FAILURE with nothing sent, and an unknown model came back 404 ' +
+        'classified PROVIDER_FAILURE. Recorded from the machine-written report at ' +
+        '.routepilot/direct-provider-verification.json, which the script refuses to ' +
+        'write if it finds the credential anywhere in its own output.',
+    },
     limitations: [
-      'No concrete provider protocol ships yet. The transport, retry, timeout, ' +
-        'cancellation and credential redaction are implemented and tested; the ' +
-        'request/response mapping for any specific provider is not, because inventing ' +
-        'one would be guessing at an API.',
+      'CONFIRMED against the real API: endpoint and path construction, api-key ' +
+        'authentication, SSE decoding, incremental event delivery, usage reporting, ' +
+        'and the classification of both a missing credential and an HTTP error.',
+      'ONE PROTOCOL ONLY. `anthropicMessagesProtocol` is verified; every other ' +
+        'provider still needs its own ProviderProtocol, and none ships. Verified here ' +
+        'means the transport works and one vendor mapping is correct -- not that any ' +
+        'other provider will work.',
+      'NOT CONFIRMED: tool use, structured output, long or interrupted streams, ' +
+        'cancellation mid-request, and timeout behaviour against the real endpoint. ' +
+        'The verified request was a few tokens of plain text.',
+      'This is not a coding agent. `agenticExecution` is false and `canHandle` ' +
+        'refuses any request needing it, so a task that must edit files can never ' +
+        'reach this adapter.',
+      'Verification needs a real credential, so it is deliberately outside ' +
+        '`npm run verify` and never runs in CI. The credential is read from the ' +
+        'environment by name, never accepted as an argument, and never printed.',
     ],
   },
   {

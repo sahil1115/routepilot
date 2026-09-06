@@ -1109,14 +1109,28 @@ describe('verification honesty (spec section 2, rule 20)', () => {
     }
   });
 
-  it('still has adapters that are not verified, and does not hide them', () => {
-    // The moment every adapter is marked verified this fails, which is the
-    // point: it must take a deliberate edit here to make that claim, not a
-    // quiet flip of one field.
-    const unverified = ADAPTER_VERIFICATION.filter(
-      (entry) => entry.adapterId !== 'fake' && entry.status !== 'verified',
+  it('states every adapter status explicitly, so none can be flipped quietly', () => {
+    // This guard used to assert that at least one adapter was still unverified
+    // and name it, so that claiming otherwise took a deliberate edit here. On
+    // 2026-09-06 `direct-provider` was verified against the real Anthropic API
+    // and that floor became a demand that the project never finish.
+    //
+    // The protection was never the count. It was that no status changes without
+    // someone editing this line, so the whole map is asserted instead -- which
+    // also catches a downgrade and a newly added adapter, neither of which the
+    // old form noticed.
+    const statuses = Object.fromEntries(
+      ADAPTER_VERIFICATION.filter((entry) => entry.adapterId !== 'fake').map((entry) => [
+        entry.adapterId,
+        entry.status,
+      ]),
     );
-    expect(unverified.map((entry) => entry.adapterId)).toEqual(['direct-provider']);
+
+    expect(statuses).toEqual({
+      'claude-code': 'verified',
+      'cursor-cli': 'verified',
+      'direct-provider': 'verified',
+    });
   });
 
   it('names the tool version in the evidence of anything verified', () => {

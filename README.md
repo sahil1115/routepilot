@@ -11,20 +11,24 @@ what it expects to cost.
 > RoutePilot **routes, runs, and edits code**. Both agent adapters have been
 > driven through real coding tasks and checked against the filesystem.
 >
-> - The pipeline is complete and tested — 1353 tests across 63 files, and
+> - The pipeline is complete and tested — 1372 tests across 64 files, and
 >   `npm run gate` maps every quality-gate item to the evidence for it.
-> - **Two adapters are verified against their real tools**: Claude Code 2.1.72
->   and Cursor CLI 2026.09.02. On 2026-09-04 each scored **4/4** on the same
->   fixture suite — fixing a failing test suite, creating a file, declining to
->   fabricate a missing one, and cancelling mid-run. Every assertion observed
+> - **Both agent adapters are verified against their real tools**: Claude Code
+>   2.1.72 and Cursor CLI 2026.09.02. On 2026-09-04 each scored **4/4** on the
+>   same fixture suite — fixing a failing test suite, creating a file, declining
+>   to fabricate a missing one, and cancelling mid-run. Every assertion observed
 >   the filesystem or the process, never the transcript.
 > - **Claude Code needs a permission mode to write.** With none set it scores
 >   2/4: print mode cannot prompt, so every edit is declined. Set
 >   `agents."claude-code".permissionMode` to `acceptEdits`. RoutePilot passes no
 >   mode by default and will not widen your permissions for you.
-> - **The direct HTTP adapter remains unverified.** It has never been given a
->   credential. Escalation between models has not been exercised against real
->   agents either.
+> - **The direct HTTP adapter is verified too**, on 2026-09-06 against the
+>   Anthropic Messages API: 4/4, including a real streamed request reporting
+>   token usage. One protocol is written and proven; every other provider still
+>   needs its own, and none ships. See [docs/DIRECT_PROVIDER.md](docs/DIRECT_PROVIDER.md).
+> - **Escalation between models has not been exercised against real agents**,
+>   and no real task has yet been driven through the direct adapter beyond a
+>   few tokens of plain text.
 > - **A run reports `unverified` unless your workspace declares test, build or
 >   typecheck scripts.** RoutePilot will not call a task successful on the
 >   agent's word alone.
@@ -189,19 +193,18 @@ Requires Node ≥ 20.11.
 
 The ones that would matter most if you were considering using this:
 
-1. **Two adapters have each been executed against a real model, once.** Claude
-   Code 2.1.72 (Claude Haiku 4.5) and Cursor CLI 2026.09.02, both on 2026-09-03,
-   both returning `completed`. That proves transport, the event schema and
-   normalisation. It does not prove cancellation, timeout handling, failure
-   classification, or any task needing tool use. Cursor reported no usage at
-   all, so its costs are estimates rather than measurements. `direct-provider`
-   remains unverified. The table is in `routepilot status`.
-2. **`routepilot run --execute` has never been run against a real agent.** The
-   command exists and the spine is wired; every end-to-end assertion behind it
-   still uses a scripted executor.
-3. **Only the extension is verified end to end.** It runs in a real VS Code
-   host; no agent adapter has been run against its real tool, which is the gap
-   that matters more.
+1. **`routepilot run --execute` has never been run against a real agent.** This
+   is the largest remaining gap. The adapters are verified by driving them
+   directly; the command that routes, runs, validates and escalates around them
+   still has only a scripted executor behind every end-to-end assertion.
+2. **Escalation between models has never happened for real.** It is a
+   `TaskRunner` decision across two attempts, and no real run has produced one.
+   Cursor also reports no token usage, so its costs are estimates rather than
+   measurements.
+3. **The direct provider is verified for one provider and one shape.** Anthropic
+   only, and a few tokens of plain text — no tool use, no structured output, no
+   long or interrupted streams. Every other provider needs its own
+   `ProviderProtocol`, and none ships.
 4. **`session`, `daily` and `monthly` budgets are not enforced.** Only `request`
    is applied.
 5. **Learning is inert in practice.** It needs 200 recorded outcomes per model,

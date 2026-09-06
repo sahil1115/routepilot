@@ -90,21 +90,35 @@ describe('internal links resolve', () => {
 });
 
 describe('the documentation does not overclaim', () => {
-  it('names which adapters are still unverified, rather than implying all are', async () => {
-    // This guard used to assert the README said *no* adapter was verified. On
-    // 2026-09-03 the Claude Code adapter ran against a real model, so the claim
-    // changed -- deliberately, and only after a machine-written report existed.
-    // What it must never do is round "one of three" up to "verified".
+  it('the README agrees with the table about what is unverified', async () => {
+    // This guard has tracked three states. It first asserted the README said no
+    // adapter was verified; then, from 2026-09-03, that it named the ones still
+    // outstanding without rounding "one of three" up to "all". On 2026-09-06 the
+    // last one was verified, and the guard's old floor -- at least one adapter
+    // must be unverified -- became a demand that the project never finish.
+    //
+    // The invariant underneath was never that count. It is that the README and
+    // the table say the same thing, which has to hold in both directions: name
+    // every unverified adapter while any remain, and stop calling them
+    // unverified once none do.
     const unverified = ADAPTER_VERIFICATION.filter(
       (entry) => entry.adapterId !== 'fake' && entry.status !== 'verified',
     );
-    expect(unverified.length).toBeGreaterThan(0);
 
     const readme = await readFile(join(root, 'README.md'), 'utf8');
-    for (const entry of unverified) {
-      expect(readme.toLowerCase()).toContain(entry.adapterId.split('-')[0]);
+
+    if (unverified.length > 0) {
+      for (const entry of unverified) {
+        expect(readme.toLowerCase()).toContain(entry.adapterId.split('-')[0]);
+      }
+      expect(readme).toMatch(/unverified/i);
+    } else {
+      // Nothing is outstanding, so the README must not imply something is.
+      expect(
+        /\b(remains?|still)\s+unverified\b/i.test(readme),
+        'every adapter is verified, but the README still calls one unverified',
+      ).toBe(false);
     }
-    expect(readme).toMatch(/unverified/i);
   });
 
   it('records how the VS Code extension was verified, and against which version', async () => {
@@ -174,7 +188,20 @@ describe('the adapter docs and the verification table cannot drift apart', () =>
   const PAGES: Readonly<Record<string, string>> = {
     'claude-code': 'docs/CLAUDE_CODE.md',
     'cursor-cli': 'docs/CURSOR.md',
+    'direct-provider': 'docs/DIRECT_PROVIDER.md',
   };
+
+  it('every non-fake adapter has a page held to this rule', () => {
+    // Otherwise a new adapter could ship with no page and no guard, which is
+    // how `docs/CLAUDE_CODE.md` drifted in the first place.
+    const documented = new Set(Object.keys(PAGES));
+    for (const entry of ADAPTER_VERIFICATION) {
+      if (entry.adapterId === 'fake') continue;
+      expect(documented.has(entry.adapterId), `${entry.adapterId} has no documented page`).toBe(
+        true,
+      );
+    }
+  });
 
   it.each(Object.entries(PAGES))('%s agrees with its page', async (adapterId, page) => {
     const entry = ADAPTER_VERIFICATION.find((candidate) => candidate.adapterId === adapterId);
