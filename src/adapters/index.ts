@@ -3,9 +3,9 @@
  *
  * This layer depends inward on `src/core`; the core never imports from here.
  *
- * **No adapter that talks to an external tool is verified.** See
- * `verification.ts` — implemented and mock-tested is not the same as known to
- * work (spec section 2, rule 20).
+ * `verification.ts` is the authority on what has actually been observed to
+ * work. Implemented and mock-tested is not the same as known to work
+ * (spec section 2, rule 20).
  */
 
 export { AgentRegistry, AdapterRegistryError, DEFAULT_RETRY } from './registry.js';
@@ -38,6 +38,8 @@ export { CursorCliAdapter } from './cursor/adapter.js';
 export type { CursorCliAdapterOptions } from './cursor/adapter.js';
 
 export { DirectProviderAdapter } from './direct/adapter.js';
+export { anthropicMessagesProtocol, ANTHROPIC_VERSION } from './direct/protocols/anthropic.js';
+export type { AnthropicProtocolOptions } from './direct/protocols/anthropic.js';
 export type {
   DirectProviderAdapterOptions,
   FetchLike,
