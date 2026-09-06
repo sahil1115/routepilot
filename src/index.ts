@@ -33,7 +33,7 @@ export const TAGLINE = 'Choose the cheapest path to success.' as const;
  * provider protocol exists. A major version would claim a stability this has
  * not earned.
  */
-export const VERSION = '0.6.2' as const;
+export const VERSION = '0.7.0' as const;
 
 /**
  * Implementation phase actually present in this build.
