@@ -109,6 +109,79 @@ cost to success.
 
 ---
 
+## Fleet
+
+Optional. Restricts RoutePilot to a short list of models you permit it to use.
+
+```jsonc
+"fleet": {
+  "models": [
+    { "id": "anthropic/claude-haiku-4-5", "tier": "cheap" },
+    { "id": "anthropic/claude-sonnet-5", "tier": "medium" },
+    { "id": "anthropic/claude-opus-5", "tier": "expensive" }
+  ]
+}
+```
+
+**You choose the models. RoutePilot chooses which one runs each task.**
+
+The fleet is an eligibility constraint, not a routing algorithm. Expected-cost
+routing, capability checks, budgets, the contextual bandit and escalation all
+work exactly as they do without one — they simply operate on your list. Omit
+`fleet` entirely and every configured model is routable, as before.
+
+### What it restricts
+
+Everything. The model registry itself is narrowed to the fleet before anything
+runs, so initial routing, deterministic routing, bandit exploration, retries,
+escalation, provider fallback and recovery all draw from the same restricted
+set. There is no path by which a model outside the fleet can be selected.
+
+### Tier is metadata
+
+`tier` is your own label: `cheap`, `medium`, `expensive` or `custom`. It is
+reported in explanations and `routepilot status`, and it is **never** used to
+order or gate a selection.
+
+In particular, `cheap` does not mean "try first" and `expensive` does not mean
+"escalate to". A cheap model may be chosen for a hard task, and an expensive one
+immediately, whenever expected cost to success says so. It is deliberately
+separate from a model's own `tier` (`cheap | medium | frontier | ultra`), which
+is the capability band routing does reason about.
+
+### No pricing here
+
+A fleet entry says only which models are permitted and what you call them. The
+`models` array remains the single source of truth for cost. There is no second
+pricing system to keep in step.
+
+### Matching, warnings and errors
+
+An entry's `id` matches either a model's `id` or its provider-native `modelId`,
+so `claude-haiku-4-5` works without the provider prefix. A `modelId` served by
+two providers puts both in the fleet, which is what lets provider fallback stay
+inside it rather than dead-ending.
+
+| Situation                                           | Result                                                   |
+| --------------------------------------------------- | -------------------------------------------------------- |
+| An entry matches no configured model                | **Warning** on stderr; the rest of the fleet still works |
+| _No_ entry matches any configured model             | **Error**; routing would have nothing to choose from     |
+| Duplicate ids, empty ids, more than 5, fewer than 1 | **Error**                                                |
+
+One mistyped line should not make a fleet unusable, which is why an unknown id
+warns. A fleet where nothing resolves is different: the only alternatives are to
+fail or to quietly ignore the fleet and route outside it, and failing is the
+honest one.
+
+### Limitation: tier is not persisted
+
+The fleet tier is carried on the routing decision and shown in explanations and
+status, but it is **not written to the telemetry database**. Adding it would
+mean a SQLite migration, which is out of scope for the phase that introduced
+the fleet. Selected model ids are recorded as they always have been.
+
+---
+
 ## Routing
 
 ```jsonc

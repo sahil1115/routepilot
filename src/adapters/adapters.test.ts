@@ -564,6 +564,27 @@ describe('Cursor CLI adapter', () => {
     expect(argv).not.toContain('-f');
   });
 
+  it('passes a fleet-selected model straight through to --model', async () => {
+    // Phase 25 adds no fleet logic to any adapter, and this is what makes that
+    // safe to say. A model carrying a fleet tier is an ordinary ModelSpec: the
+    // adapter sends its provider-native modelId and never reads the label.
+    const argsPath = join(tmpdir(), `routepilot-cursor-fleet-${String(process.pid)}.json`);
+    const cli = await stub({ stdout: cursorSuccessTranscript(), recordArgsTo: argsPath });
+    const adapter = new CursorCliAdapter({ command: cli.command, commandArgs: cli.commandArgs });
+
+    const fleetModel = { ...model, fleetTier: 'expensive' as const };
+    const session = await adapter.execute(request({ workspaceRoot: cli.dir }), fleetModel);
+    await session.result;
+
+    const argv = JSON.parse(await readFile(argsPath, 'utf8')) as string[];
+    await rm(argsPath, { force: true });
+
+    expect(argv[argv.indexOf('--model') + 1]).toBe(fleetModel.modelId);
+    // The user's label is routing metadata and has no business on the wire.
+    expect(argv).not.toContain('expensive');
+    expect(argv).not.toContain('--fleet-tier');
+  });
+
   it('returns an actionable setup error when cursor-agent is absent', async () => {
     // Spec section 19: an unavailable CLI must produce actionable guidance.
     const adapter = new CursorCliAdapter({ command: 'routepilot-no-such-cursor-agent' });

@@ -206,7 +206,10 @@ export async function runTask(options: RunCommandOptions): Promise<RunCommandRes
     return refuse('budget-exceeded', built.probes);
   }
 
-  const { models } = buildRegistries(config);
+  const registries = buildRegistries(config);
+  const { models } = registries;
+
+  for (const warning of registries.fleet?.warnings ?? []) options.onProblem?.(warning);
 
   // Learning is handed to the runner only when it is switched on. Absent, the
   // runner records no observations at all — the difference between "learning is

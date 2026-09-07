@@ -8,7 +8,7 @@
  */
 
 import type { ModelExclusion } from './eligibility.js';
-import type { ModelTier } from './model.js';
+import type { FleetTier, ModelTier } from './model.js';
 
 /** The thresholds and limits a routing decision must respect. */
 export interface RoutingPolicy {
@@ -82,6 +82,14 @@ export interface CostProjection {
 export interface ModelEvaluation {
   readonly modelId: string;
   readonly tier: ModelTier;
+  /**
+   * The user's fleet label, when a fleet is configured.
+   *
+   * Carried so an explanation can say which band the user put this model in.
+   * It played no part in choosing: fleet membership is decided before routing,
+   * and the label itself never orders or gates anything.
+   */
+  readonly fleetTier?: FleetTier | undefined;
   /**
    * Estimated probability of completing the task, in [0, 1].
    *

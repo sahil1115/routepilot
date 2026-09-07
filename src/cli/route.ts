@@ -74,6 +74,14 @@ export interface RouteOptions extends AnalyzeOptions {
    * can only ever prevent an experiment (spec section 40).
    */
   readonly operationMode?: OperationMode | undefined;
+  /**
+   * Reports a non-fatal configuration problem, such as a fleet entry that
+   * matches no configured model.
+   *
+   * Absent means the caller does not want them. A warning is never a reason to
+   * refuse to route.
+   */
+  readonly onProblem?: ((message: string) => void) | undefined;
 }
 
 /** How many past predictions the calibration safeguard reads. */
@@ -85,7 +93,10 @@ export const SHADOW_WINDOW = 5_000;
 /** Analyse a task and route it. */
 export async function routeTask(options: RouteOptions): Promise<RouteResult> {
   const analysis = await analyzeTask(options);
-  const { models } = buildRegistries(options.config);
+  const registries = buildRegistries(options.config);
+  const { models } = registries;
+
+  for (const warning of registries.fleet?.warnings ?? []) options.onProblem?.(warning);
 
   const policy: RoutingPolicy = {
     ...toRoutingPolicy(options.config),

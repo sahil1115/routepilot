@@ -7,7 +7,7 @@
  * `exactOptionalPropertyTypes` honest instead of forcing casts at the boundary.
  */
 
-import type { ModelSpec } from '../core/types/model.js';
+import type { FleetTier, ModelSpec } from '../core/types/model.js';
 import type { ProviderSpec } from '../core/types/provider.js';
 
 /** What the router is allowed to do, and the thresholds it must respect. */
@@ -61,6 +61,40 @@ export interface AgentConfig {
 export interface AgentsConfig {
   readonly 'claude-code': AgentConfig;
   readonly 'cursor-cli': AgentConfig;
+}
+
+/**
+ * One model the user permits RoutePilot to route to.
+ *
+ * Carries no pricing. The model registry remains the single source of truth for
+ * what a model costs; a fleet entry says only *which* models are permitted and
+ * what the user calls each one.
+ */
+export interface FleetModelConfig {
+  /**
+   * The model's id, or its provider-native `modelId`.
+   *
+   * Both are accepted so a user can write `claude-haiku-4-5` without repeating
+   * the provider prefix. Matching on `modelId` also means a model offered by
+   * two providers is in the fleet under both, which is what lets provider
+   * fallback stay inside the fleet rather than dead-ending.
+   */
+  readonly id: string;
+  /** The user's own label. Metadata; it never orders or gates selection. */
+  readonly tier: FleetTier;
+}
+
+/**
+ * The models RoutePilot is allowed to use.
+ *
+ * A hard eligibility constraint, not a routing algorithm. When a fleet is
+ * configured the model registry is restricted to it before anything else runs,
+ * so routing, expected cost, the bandit, retries, escalation and provider
+ * fallback all operate on the fleet and cannot reach past it. Absent means
+ * every configured model is routable, exactly as before.
+ */
+export interface FleetConfig {
+  readonly models: readonly FleetModelConfig[];
 }
 
 /** What RoutePilot does when a request cannot be served inside budget. */
@@ -223,4 +257,6 @@ export interface RoutePilotConfig {
   readonly learning: LearningConfig;
   readonly shadow: ShadowConfig;
   readonly telemetry: TelemetryConfig;
+  /** The models RoutePilot may route to. Absent means all of them. */
+  readonly fleet?: FleetConfig | undefined;
 }

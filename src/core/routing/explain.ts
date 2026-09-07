@@ -95,6 +95,11 @@ function describeCandidate(
   if (candidate.usedTierDefault) {
     parts.push('success estimated from a tier default, not a declared prior');
   }
+  if (candidate.fleetTier !== undefined) {
+    // The user's own label, reported so a decision can be read against the
+    // fleet they wrote. It did not influence the ranking above it.
+    parts.push(`fleet: ${candidate.fleetTier}`);
+  }
 
   const suffix = failures.length > 0 ? ` — rejected: ${failures.join(', ')}` : '';
   return `${marker} ${candidate.modelId} (${candidate.tier}): ${parts.join(', ')}${suffix}`;

@@ -392,6 +392,24 @@ export class RoutingEngine {
       calibrationPermits: this.#learned.calibration.mayApply,
     };
 
+    // Nothing to experiment with. A one-model fleet reaches here, and so does
+    // any request the constraint filter narrowed to a single candidate: with
+    // one viable model, exploring and exploiting name the same model, and
+    // reporting an experiment would be a claim that no choice existed to make.
+    // `decideExploration` already returns the exploit choice in that case, but
+    // it does so incidentally, via a budget comparison. Saying it here makes
+    // the guarantee explicit and gives the user an accurate reason.
+    if (viable.length < 2) {
+      return {
+        explored: false,
+        selectedModelId: exploit.modelId,
+        exploitModelId: exploit.modelId,
+        premium: null,
+        blockedBy: null,
+        reason: 'exploiting: only one model is eligible, so there is nothing to explore',
+      };
+    }
+
     const verdict = assessExploration(this.#exploration, features, context, policy);
 
     return decideExploration({
@@ -462,6 +480,7 @@ export class RoutingEngine {
       return {
         modelId: model.id,
         tier: model.tier,
+        ...(model.fleetTier === undefined ? {} : { fleetTier: model.fleetTier }),
         successProbability: probability,
         staticSuccessProbability: learned.staticProbability,
         observations: learned.observations,

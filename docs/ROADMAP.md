@@ -52,8 +52,9 @@ and had drifted out of step with the code; it was corrected in Phase 9.
 | 22    | Closing the loop — record and learn     | **Complete**              |
 | 23    | Re-inspection and plan                  | **Complete**              |
 | 24    | `run --execute` honours plan and budget | **Complete**              |
-| 25    | Validation configuration                | Next                      |
+| 25    | User-defined model fleet                | **Complete**              |
 | 26    | Offline policy evaluation               | Not started               |
+| 27    | Validation configuration                | Not started               |
 
 Phases 10 and 11 of the _original_ roadmap (validation engine, telemetry schema)
 were folded into Phases 6 and 8 respectively and are complete. Roadmap Phase 12
@@ -882,9 +883,55 @@ injected option, decided at the CLI edge; the core holds no platform knowledge.
 
 ---
 
-## Phase 25 — Validation configuration
+## Phase 25 — User-defined model fleet (complete)
 
-Next. See `docs/ARCHITECTURE.md` §4, item 1.
+An optional `fleet` naming 1–5 models RoutePilot is permitted to route to, with
+a user-chosen tier label on each. See `docs/CONFIGURATION.md` § Fleet.
+
+The fleet is an **eligibility constraint, not a routing algorithm**. Nothing
+about selection changed: expected cost, capability filtering, budgets, the
+contextual bandit and escalation all behave as before and simply operate on the
+user's list.
+
+The whole implementation is one chokepoint. `buildRegistries` restricts the
+model registry before anything else runs, and every later stage — the
+constraint filter, expected-cost ranking, the bandit, retries, escalation,
+provider fallback and recovery — draws its candidates from that registry. There
+is no separate fleet router and no per-stage filtering, because a model absent
+from the registry is unreachable rather than merely unlikely.
+
+Decisions worth recording:
+
+- **Tier is metadata.** Reported in explanations and `routepilot status`, never
+  used to order or gate a selection. `cheap` does not mean "try first". It is
+  deliberately a separate type from `ModelTier`, which routing does reason
+  about.
+- **No second pricing system.** A fleet entry names a model and a label. The
+  `models` array stays the source of truth for cost.
+- **An unknown id warns; a fleet where nothing resolves is an error.** One
+  mistyped line must not make a fleet unusable, but silently ignoring an
+  unresolvable fleet would mean routing outside it, which is the one thing a
+  fleet exists to prevent.
+- **A one-model fleet does not explore.** The routing engine now returns the
+  exploit choice explicitly when fewer than two candidates are viable, rather
+  than relying on the bandit's budget comparison to reach the same answer by
+  accident.
+- **Ids match `id` or `modelId`**, so a shared model string puts every provider
+  serving it in the fleet — which is what keeps provider fallback inside the
+  fleet instead of dead-ending.
+
+**Limitation.** The fleet tier is not persisted: `routing_decisions` and
+`candidates` have no column for it and this phase adds no SQLite migration. It
+is carried on the routing decision and available to every consumer of a
+`RunResult`. A test asserts the absence, so adding the column later cannot
+happen without revisiting the documentation.
+
+---
+
+## Phase 27 — Validation configuration
+
+Not started. See `docs/ARCHITECTURE.md` §4, item 1. Displaced from 25 when the
+model fleet took that number.
 
 ---
 

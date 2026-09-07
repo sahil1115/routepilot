@@ -13,6 +13,20 @@ export const MODEL_TIERS = ['cheap', 'medium', 'frontier', 'ultra'] as const;
 /** Coarse capability/price band. */
 export type ModelTier = (typeof MODEL_TIERS)[number];
 
+/** The labels a user may attach to a model in their fleet. */
+export const FLEET_TIERS = ['cheap', 'medium', 'expensive', 'custom'] as const;
+
+/**
+ * A user's own classification of a model in their fleet.
+ *
+ * Deliberately separate from {@link ModelTier}, which is the capability and
+ * price band routing already reasons about. This one is metadata: it is
+ * reported and explained, and it never orders, ranks or gates a selection. A
+ * `cheap` model may be chosen for hard work and an `expensive` one immediately,
+ * because the routing policy decides that and this label does not.
+ */
+export type FleetTier = (typeof FLEET_TIERS)[number];
+
 /**
  * Graded capability dimensions (spec section 8).
  *
@@ -189,4 +203,14 @@ export interface ModelSpec {
   readonly constraints?: OperationalConstraints | undefined;
   /** Free-form labels for operator filtering. */
   readonly tags?: readonly string[] | undefined;
+  /**
+   * The user's fleet label, when a fleet is configured and includes this model.
+   *
+   * Attached to the spec so it travels with the model through routing, cost
+   * estimation, the bandit and escalation without any of them needing to know
+   * a fleet exists. Absent means no fleet is configured, or this model is not
+   * in it -- and a model that is not in a configured fleet never reaches these
+   * stages at all, because the registry itself is restricted.
+   */
+  readonly fleetTier?: FleetTier | undefined;
 }

@@ -19,7 +19,7 @@ import { pathToFileURL } from 'node:url';
 
 import { ConfigurationError } from '../config/errors.js';
 import { loadConfig, type LoadedConfig } from '../config/load.js';
-import { buildRegistries } from '../config/registries.js';
+import { buildRegistries, type Registries } from '../config/registries.js';
 import { TaskClassifier } from '../core/analysis/task-classifier.js';
 import type { AnalysisLevel } from '../core/types/analysis.js';
 import type { ModelRequirements } from '../core/types/eligibility.js';
@@ -250,6 +250,9 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
   };
 
   const route = await routeTask({
+    onProblem: (message) => {
+      io.err(`Warning: ${message}`);
+    },
     prompt,
     root,
     level: args.level ?? chooseAnalysisLevel(new TaskClassifier().classify({ prompt })),
@@ -378,6 +381,9 @@ async function commandRoute(args: CliArgs, io: CliIO): Promise<number> {
     : undefined;
 
   const result = await routeTask({
+    onProblem: (message) => {
+      io.err(`Warning: ${message}`);
+    },
     prompt,
     root: args.root ?? process.cwd(),
     ...(learningStore === undefined ? {} : { learningStore }),
@@ -480,7 +486,9 @@ async function commandAnalyze(args: CliArgs, io: CliIO): Promise<number> {
 
 async function commandModels(args: CliArgs, io: CliIO): Promise<number> {
   const loaded = await load(args, io);
-  const { models } = buildRegistries(loaded.config);
+  const registries = buildRegistries(loaded.config);
+  reportFleet(registries, io);
+  const { models } = registries;
 
   const filtered = hasAnyFilter(args);
 
@@ -540,7 +548,9 @@ async function commandModels(args: CliArgs, io: CliIO): Promise<number> {
 
 async function commandProviders(args: CliArgs, io: CliIO): Promise<number> {
   const loaded = await load(args, io);
-  const { providers } = buildRegistries(loaded.config);
+  const registries = buildRegistries(loaded.config);
+  reportFleet(registries, io);
+  const { providers } = registries;
 
   if (args.flags.has('json')) {
     io.out(JSON.stringify({ configPath: loaded.path, providers: providers.list() }, null, 2));
@@ -653,7 +663,9 @@ async function commandConfig(args: CliArgs, io: CliIO): Promise<number> {
   }
 
   const loaded = await load(args, io);
-  const { models, providers } = buildRegistries(loaded.config);
+  const registries = buildRegistries(loaded.config);
+  reportFleet(registries, io);
+  const { models, providers } = registries;
   const { learning, telemetry } = loaded.config;
 
   io.out(`Configuration is valid: ${loaded.path}`);
@@ -670,6 +682,7 @@ async function commandConfig(args: CliArgs, io: CliIO): Promise<number> {
 async function commandStatus(args: CliArgs, io: CliIO): Promise<number> {
   const loaded = await load(args, io);
   const registries = buildRegistries(loaded.config);
+  reportFleet(registries, io);
 
   const options = {
     loaded,
@@ -698,6 +711,19 @@ async function load(args: CliArgs, io: CliIO): Promise<LoadedConfig> {
   }
 
   return loaded;
+}
+
+/**
+ * Report anything a configured fleet could not resolve.
+ *
+ * A fleet entry naming nothing is a warning, never fatal: one mistyped line
+ * should not make the rest of a fleet unusable. A fleet where *nothing*
+ * resolves is rejected during validation instead, because routing would then
+ * have no candidates and the only alternative to failing would be to ignore the
+ * fleet and route outside it.
+ */
+function reportFleet(registries: Registries, io: CliIO): void {
+  for (const warning of registries.fleet?.warnings ?? []) io.err(`Warning: ${warning}`);
 }
 
 /** The task text, or null when none was given. */

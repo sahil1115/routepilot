@@ -407,3 +407,186 @@ describe('ConfigurationError formatting', () => {
     expect(error.message).toContain('(root): not an object');
   });
 });
+
+describe('the fleet restricts which models may be routed to (Phase 25)', () => {
+  /** Two models, so a fleet can name one and exclude the other. */
+  function twoModels(): Record<string, unknown>[] {
+    return [
+      makeModelDocument({ id: 'acme/fast-1', modelId: 'fast-1' }),
+      makeModelDocument({ id: 'acme/slow-1', modelId: 'slow-1' }),
+    ];
+  }
+
+  it('accepts a fleet naming a configured model', () => {
+    const config = parseConfig(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: { models: [{ id: 'acme/fast-1', tier: 'cheap' }] },
+      }),
+    );
+
+    expect(config.fleet?.models).toEqual([{ id: 'acme/fast-1', tier: 'cheap' }]);
+  });
+
+  it('accepts a model named by its provider-native modelId', () => {
+    // So a user can write `fast-1` without repeating the provider prefix.
+    const config = parseConfig(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: { models: [{ id: 'fast-1', tier: 'medium' }] },
+      }),
+    );
+
+    expect(config.fleet?.models[0]?.id).toBe('fast-1');
+  });
+
+  it('rejects a duplicate fleet model id', () => {
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: {
+          models: [
+            { id: 'acme/fast-1', tier: 'cheap' },
+            { id: 'acme/fast-1', tier: 'expensive' },
+          ],
+        },
+      }),
+    );
+
+    expect(paths(error)).toContain('fleet.models[1].id');
+    expect(error.message).toContain('duplicate fleet model id');
+  });
+
+  it('rejects an empty model id', () => {
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: { models: [{ id: '', tier: 'cheap' }] },
+      }),
+    );
+
+    expect(paths(error)).toContain('fleet.models[0].id');
+  });
+
+  it('rejects a blank model id', () => {
+    // `"   "` is not empty by length but names nothing.
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: { models: [{ id: '   ', tier: 'cheap' }] },
+      }),
+    );
+
+    expect(paths(error)).toContain('fleet.models[0].id');
+  });
+
+  it('rejects an unknown tier', () => {
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: { models: [{ id: 'acme/fast-1', tier: 'gigantic' }] },
+      }),
+    );
+
+    expect(paths(error)).toContain('fleet.models[0].tier');
+  });
+
+  it('rejects a fleet where no model matches, and names the known ones', () => {
+    // The alternative would be to ignore the fleet and route outside it, which
+    // is the one thing a fleet exists to prevent.
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: { models: [{ id: 'ghost/nothing', tier: 'cheap' }] },
+      }),
+    );
+
+    expect(paths(error)).toContain('fleet.models');
+    expect(error.message).toContain('no model named in the fleet matches');
+    expect(error.issues.find((issue) => issue.path === 'fleet.models')?.hint).toContain(
+      'acme/fast-1',
+    );
+  });
+
+  it('accepts a fleet where only some entries match', () => {
+    // One bad line must not make the rest unusable. The unknown entry becomes a
+    // warning at registry-build time, not a validation error.
+    const config = parseConfig(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: {
+          models: [
+            { id: 'acme/fast-1', tier: 'cheap' },
+            { id: 'ghost/nothing', tier: 'expensive' },
+          ],
+        },
+      }),
+    );
+
+    expect(config.fleet?.models).toHaveLength(2);
+  });
+
+  it('rejects an empty fleet rather than treating it as no fleet', () => {
+    // An empty list reads as "permit nothing". Silently permitting everything
+    // would be the opposite of what was written.
+    const error = expectRejected(
+      makeConfigDocument({ models: twoModels(), fleet: { models: [] } }),
+    );
+
+    expect(paths(error)).toContain('fleet.models');
+  });
+
+  it('rejects more than five models', () => {
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: {
+          models: Array.from({ length: 6 }, (_unused, index) => ({
+            id: `acme/model-${String(index)}`,
+            tier: 'custom',
+          })),
+        },
+      }),
+    );
+
+    expect(paths(error)).toContain('fleet.models');
+  });
+
+  it('accepts exactly five models', () => {
+    const models = Array.from({ length: 5 }, (_unused, index) =>
+      makeModelDocument({ id: `acme/model-${String(index)}`, modelId: `model-${String(index)}` }),
+    );
+
+    const config = parseConfig(
+      makeConfigDocument({
+        models,
+        fleet: {
+          models: models.map((model) => ({ id: model['id'] as string, tier: 'custom' as const })),
+        },
+      }),
+    );
+
+    expect(config.fleet?.models).toHaveLength(5);
+  });
+
+  it('leaves fleet absent when it is not configured', () => {
+    // Absent and empty must stay distinguishable all the way through.
+    const config = parseConfig(makeConfigDocument({ models: twoModels() }));
+    expect(config.fleet).toBeUndefined();
+  });
+
+  it('rejects pricing inside a fleet entry', () => {
+    // The model registry is the single source of truth for cost. A second one
+    // could disagree with it.
+    const error = expectRejected(
+      makeConfigDocument({
+        models: twoModels(),
+        fleet: {
+          models: [{ id: 'acme/fast-1', tier: 'cheap', pricing: { inputPerMillion: 1 } }],
+        },
+      }),
+    );
+
+    expect(paths(error).some((path) => path.startsWith('fleet.models[0]'))).toBe(true);
+  });
+});

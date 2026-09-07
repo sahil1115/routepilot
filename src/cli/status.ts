@@ -90,6 +90,12 @@ export function buildStatus(options: StatusOptions): Record<string, unknown> {
       valid: true,
       providers: registries.providers.size,
       models: registries.models.size,
+      ...(registries.fleet === null
+        ? {}
+        : {
+            fleetExcluded: registries.fleet.excludedCount,
+            fleetWarnings: registries.fleet.warnings,
+          }),
     },
     providers: registries.providers.list().map((provider) => ({
       id: provider.id,
@@ -135,6 +141,15 @@ export function renderStatus(options: StatusOptions): string {
       ['valid', 'yes'],
       ['providers', count(registries.providers.size)],
       ['models', count(registries.models.size)],
+      ...(registries.fleet === null
+        ? []
+        : ([
+            [
+              'fleet',
+              `${count(registries.models.size)} routable, ` +
+                `${count(registries.fleet.excludedCount)} excluded by the configured fleet`,
+            ],
+          ] as const)),
     ])}`,
   );
 

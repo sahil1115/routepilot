@@ -16,7 +16,7 @@
 import { z } from 'zod';
 
 import { AVAILABILITY_STATES } from '../core/types/common.js';
-import { MODEL_TIERS, SKILL_DIMENSIONS } from '../core/types/model.js';
+import { FLEET_TIERS, MODEL_TIERS, SKILL_DIMENSIONS } from '../core/types/model.js';
 import { AUTH_KINDS, PROVIDER_KINDS } from '../core/types/provider.js';
 import { SHADOW_POLICY_IDS } from '../core/shadow/policies.js';
 import { ConfigurationError, type ConfigurationIssue } from './errors.js';
@@ -234,6 +234,35 @@ const telemetrySchema = z.strictObject({
   storagePath: z.string().min(1).optional(),
 });
 
+/**
+ * The models RoutePilot is allowed to route to (Phase 25).
+ *
+ * Bounded at 1..5 deliberately: a fleet is a short hand-written list, and a
+ * user who wants everything simply omits the key. Zero entries is rejected
+ * rather than treated as "no fleet", because an empty list reads as an
+ * intention to permit nothing and silently permitting everything would be the
+ * opposite of what was asked.
+ *
+ * No pricing here. The model registry stays the single source of truth for what
+ * a model costs.
+ */
+const fleetModelSchema = z.strictObject({
+  id: z
+    .string()
+    .min(1, 'must be a model id, not an empty string')
+    .refine((value) => value.trim() !== '', {
+      message: 'must be a model id, not blank',
+    }),
+  tier: z.enum(FLEET_TIERS),
+});
+
+const fleetSchema = z.strictObject({
+  models: z
+    .array(fleetModelSchema)
+    .min(1, 'a fleet must name at least one model; omit "fleet" to allow every model')
+    .max(5, 'a fleet may name at most 5 models'),
+});
+
 /** Schema for a complete RoutePilot configuration document. */
 export const routePilotConfigSchema = z.strictObject({
   version: z.literal(1),
@@ -245,6 +274,10 @@ export const routePilotConfigSchema = z.strictObject({
   learning: learningSchema.prefault({}),
   shadow: shadowSchema.prefault({}),
   telemetry: telemetrySchema.prefault({}),
+  // Optional with no default: absent must stay distinguishable from empty, so
+  // that "no fleet configured" and "a fleet naming nothing" cannot collapse
+  // into the same value.
+  fleet: fleetSchema.optional(),
 });
 
 /**
@@ -342,6 +375,46 @@ function validateCrossFieldRules(config: RoutePilotConfig): ConfigurationIssue[]
       });
     }
   });
+
+  if (config.fleet !== undefined) {
+    const seen = new Set<string>();
+    let anyResolves = false;
+
+    config.fleet.models.forEach((entry, index) => {
+      if (seen.has(entry.id)) {
+        issues.push({
+          path: `fleet.models[${index}].id`,
+          message: `duplicate fleet model id "${entry.id}"`,
+          hint: 'Each model may appear once; a repeat would give the same model two tiers.',
+        });
+      }
+      seen.add(entry.id);
+
+      // Matched against either identifier so a user need not repeat the
+      // provider prefix. Resolution itself lives in `buildRegistries`; this
+      // only decides whether the fleet is usable at all.
+      if (config.models.some((model) => model.id === entry.id || model.modelId === entry.id)) {
+        anyResolves = true;
+      }
+    });
+
+    // An unknown id on its own is a warning, not an error -- a fleet should not
+    // become unusable because one line has a typo. A fleet where *nothing*
+    // resolves is different: routing would have no candidates, and the only
+    // alternatives are to fail or to quietly ignore the fleet and route
+    // outside it. Failing is the honest one.
+    if (!anyResolves && config.fleet.models.length > 0) {
+      const known = config.models.map((model) => model.id).sort();
+      issues.push({
+        path: 'fleet.models',
+        message: 'no model named in the fleet matches a configured model',
+        hint:
+          known.length > 0
+            ? `Known models: ${known.join(', ')}.`
+            : 'No models are defined. Add one to the "models" array.',
+      });
+    }
+  }
 
   for (const [field, value] of [
     ['defaultProviderId', config.routing.defaultProviderId],

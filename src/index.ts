@@ -46,7 +46,7 @@ export const VERSION = '0.7.0' as const;
  * `index.test.ts` now checks it against the highest phase `docs/ROADMAP.md`
  * marks complete.
  */
-export const IMPLEMENTED_PHASE = 24 as const;
+export const IMPLEMENTED_PHASE = 25 as const;
 
 /** Describes what this build actually contains. */
 export interface BuildInfo {
