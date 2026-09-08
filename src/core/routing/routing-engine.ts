@@ -36,6 +36,7 @@ import {
   type ExplorationPolicy,
 } from '../bandit/exploration-gate.js';
 import { decideExploration } from '../bandit/explorer.js';
+import { CostCalibration } from './cost-calibration.js';
 import { ConstraintEngine, type ConstraintOptions } from './constraint-engine.js';
 import { CostEstimator, estimateLatencySeconds } from './cost-estimator.js';
 import { explainDecision } from './explain.js';
@@ -88,12 +89,13 @@ export class RoutingEngine {
     models: ModelRegistry,
     learned: LearnedSuccessModel = new LearnedSuccessModel(),
     exploration: ExplorationPolicy = EXPLORATION_DISABLED,
+    calibration: CostCalibration = new CostCalibration(),
   ) {
     this.#models = models;
     this.#constraints = new ConstraintEngine(models);
     this.#success = new SuccessPredictor();
     this.#risk = new RiskEstimator();
-    this.#cost = new CostEstimator();
+    this.#cost = new CostEstimator(calibration);
     this.#learned = learned;
     this.#exploration = exploration;
   }
@@ -481,6 +483,9 @@ export class RoutingEngine {
         modelId: model.id,
         tier: model.tier,
         ...(model.fleetTier === undefined ? {} : { fleetTier: model.fleetTier }),
+        // Only when it moved something. An unapplied correction on every
+        // candidate would be noise in every explanation.
+        ...(costed?.correction?.applied === true ? { costCorrection: costed.correction } : {}),
         successProbability: probability,
         staticSuccessProbability: learned.staticProbability,
         observations: learned.observations,

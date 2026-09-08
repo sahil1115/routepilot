@@ -221,6 +221,22 @@ const learningSchema = z.strictObject({
   calibration: calibrationSchema.prefault({}),
 });
 
+/**
+ * Correcting configured prices with measured spend.
+ *
+ * On by default, and inert until there is evidence: below
+ * `minimumMeasuredAttempts` no factor moves anything, and only attempts whose
+ * adapter reported token usage are counted at all. Unlike exploration, this
+ * spends nothing to learn -- it re-reads what was already paid.
+ */
+const costCalibrationSchema = z.strictObject({
+  enabled: z.boolean().default(true),
+  minimumMeasuredAttempts: z.number().int().min(2).default(5),
+  /** Standard errors of headroom. 1.64 is the one-sided 95% point. */
+  confidence: z.number().min(0).max(5).default(1.64),
+  maxFactor: z.number().min(1).max(100).default(3),
+});
+
 const shadowSchema = z.strictObject({
   enabled: z.boolean().default(false),
   // Validated against the built-in ids so a typo fails loudly rather than
@@ -274,6 +290,7 @@ export const routePilotConfigSchema = z.strictObject({
   learning: learningSchema.prefault({}),
   shadow: shadowSchema.prefault({}),
   telemetry: telemetrySchema.prefault({}),
+  costCalibration: costCalibrationSchema.prefault({}),
   // Optional with no default: absent must stay distinguishable from empty, so
   // that "no fleet configured" and "a fleet naming nothing" cannot collapse
   // into the same value.

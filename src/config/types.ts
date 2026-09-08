@@ -8,6 +8,7 @@
  */
 
 import type { FleetTier, ModelSpec } from '../core/types/model.js';
+import type { CostCalibrationPolicy } from '../core/routing/cost-calibration.js';
 import type { ProviderSpec } from '../core/types/provider.js';
 
 /** What the router is allowed to do, and the thresholds it must respect. */
@@ -257,6 +258,8 @@ export interface RoutePilotConfig {
   readonly learning: LearningConfig;
   readonly shadow: ShadowConfig;
   readonly telemetry: TelemetryConfig;
+  /** How measured spend may correct configured prices. */
+  readonly costCalibration: CostCalibrationPolicy;
   /** The models RoutePilot may route to. Absent means all of them. */
   readonly fleet?: FleetConfig | undefined;
 }

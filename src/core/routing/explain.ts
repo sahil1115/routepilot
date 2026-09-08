@@ -95,6 +95,14 @@ function describeCandidate(
   if (candidate.usedTierDefault) {
     parts.push('success estimated from a tier default, not a declared prior');
   }
+  if (candidate.costCorrection?.applied === true) {
+    // A projection that differs from the configured table must say why, or a
+    // reader checking the arithmetic against their own prices cannot reconcile
+    // it and will reasonably assume the router is wrong.
+    parts.push(
+      `price corrected ${candidate.costCorrection.factor.toFixed(2)}x from measured spend`,
+    );
+  }
   if (candidate.fleetTier !== undefined) {
     // The user's own label, reported so a decision can be read against the
     // fleet they wrote. It did not influence the ranking above it.

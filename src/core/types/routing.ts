@@ -78,6 +78,20 @@ export interface CostProjection {
   readonly currency: string;
 }
 
+/** What price calibration did to one model, and why. */
+export interface CostCorrection {
+  readonly modelId: string;
+  /** Multiplier applied to the configured price. Exactly 1 when not applied. */
+  readonly factor: number;
+  readonly applied: boolean;
+  /** Attempts that reported usage. Never includes estimate-only attempts. */
+  readonly measuredAttempts: number;
+  /** Mean of `actual / estimated`, or `null` with nothing measured. */
+  readonly meanRatio: number | null;
+  /** One phrase, suitable for an explanation line. */
+  readonly reason: string;
+}
+
 /** Everything the router computed about one eligible model. */
 export interface ModelEvaluation {
   readonly modelId: string;
@@ -122,6 +136,13 @@ export interface ModelEvaluation {
   readonly risk: number;
   readonly estimatedLatencySeconds: number;
   readonly cost: CostProjection;
+  /**
+   * How measured spend corrected this model's configured price, when it did.
+   *
+   * Reported so a decision can be audited against the evidence that moved it:
+   * a projection that differs from the price table should say why.
+   */
+  readonly costCorrection?: CostCorrection | undefined;
   /** The model this one would escalate to on failure, or null if it is the strongest. */
   readonly escalationTargetId: string | null;
   readonly meetsThreshold: boolean;

@@ -35,8 +35,9 @@ what it expects to cost.
 >   reports token usage. Each attempt records what was projected, what the usage
 >   actually priced at, and which of the two the figure came from, so a
 >   per-model correction factor can be measured. Attempts with no reported usage
->   are excluded rather than counted as agreeing. **The factor is recorded, not
->   yet used** — routing still prices from the configured table.
+>   are excluded rather than counted as agreeing. The factor then **corrects the
+>   projection routing acts on**, priced at the upper end of a confidence
+>   interval so that being wrong costs a dearer model rather than an overspend.
 > - **Escalation between models has still not happened for real**, and no real
 >   task has been driven through the direct adapter beyond a few tokens of plain
 >   text.
@@ -227,11 +228,10 @@ The ones that would matter most if you were considering using this:
 7. **Costs are measured only where an adapter reports usage.** Claude Code and
    the direct provider do; Cursor reports none, so its figures stay estimates.
    Every latency figure is still an estimate.
-8. **The cost correction factor changes nothing yet.** It is computed per model
-   from measured attempts and stored, but no routing decision reads it and no
-   CLI command displays it — `costReconciliation()` is reachable only through
-   the telemetry store API. Until routing consumes it, stale prices produce
-   confidently wrong routing exactly as before.
+8. **Cost correction has never fired on real data.** It is covered by tests and
+   wired into routing, but it needs five measured attempts on one model before
+   it moves anything, and no run has accumulated that yet. Until it does, prices
+   are used exactly as configured.
 
 ---
 

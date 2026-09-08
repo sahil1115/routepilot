@@ -12,8 +12,10 @@
  */
 
 import { RoutingEngine, type RoutingDecision, type RoutingPolicy } from '../core/index.js';
+import { CostCalibration } from '../core/routing/cost-calibration.js';
 import { LearnedSuccessModel } from '../core/learning/success-model.js';
 import type { LearningStore } from '../core/types/learning.js';
+import type { TelemetryStore } from '../core/types/telemetry.js';
 import type { CalibrationVerdict, PredictionStore } from '../core/types/calibration.js';
 import { assessCalibration, NOT_ASSESSED } from '../core/calibration/gate.js';
 import { resolveShadowPolicies } from '../core/shadow/policies.js';
@@ -65,7 +67,14 @@ export interface RouteOptions extends AnalyzeOptions {
    * rule 16).
    */
   readonly learningStore?:
-    (LearningStore & Partial<PredictionStore> & Partial<ShadowStore>) | undefined;
+    | (LearningStore &
+        Partial<PredictionStore> &
+        Partial<ShadowStore> &
+        // Optional because not every store measures spend: the null store does
+        // not, and a caller may pass a learning-only store. Absent means prices
+        // are used as configured.
+        Partial<Pick<TelemetryStore, 'costReconciliation'>>)
+    | undefined;
   /**
    * Where this task is being run.
    *
@@ -145,9 +154,18 @@ export async function routeTask(options: RouteOptions): Promise<RouteResult> {
           shadowPolicies,
         });
 
+  // Measured spend, when a store is available and has any. Configured prices
+  // are priors; where enough attempts reported real usage, the projection is
+  // corrected to the safe end of the interval before anything is ranked.
+  const costCalibration = new CostCalibration(
+    options.learningStore?.costReconciliation?.() ?? [],
+    options.config.costCalibration,
+  );
+
   const routingStarted = performance.now();
   const decision =
-    shadow?.current ?? new RoutingEngine(models, learned, exploration).route(routingRequest);
+    shadow?.current ??
+    new RoutingEngine(models, learned, exploration, costCalibration).route(routingRequest);
   const routingMs = performance.now() - routingStarted;
 
   return {

@@ -205,6 +205,59 @@ first two were validated and then ignored in favour of built-in defaults.
 
 ---
 
+## Cost calibration
+
+Configured prices are priors. They are typed by a human, they go out of date,
+and every routing decision multiplies by them — so a stale table produces
+confidently wrong routing however good the success model is.
+
+Where an adapter reports token usage, RoutePilot records what an attempt was
+projected to cost and what that usage actually priced at, and corrects the
+projection from the difference.
+
+```jsonc
+"costCalibration": {
+  "enabled": true,               // on by default; inert until there is evidence
+  "minimumMeasuredAttempts": 5,  // below this, no factor moves anything
+  "confidence": 1.64,            // standard errors of headroom; 1.64 is one-sided 95%
+  "maxFactor": 3                 // ceiling, so one bad run cannot exclude a model
+}
+```
+
+### It prices at the upper bound, not the mean
+
+The mean is the best guess; it is not the safe one. Under-pricing a model routes
+work to it on a budget that will not hold, and the overspend is discovered after
+the money is gone. Over-pricing at worst routes to a dearer model that was
+affordable anyway. So the factor is:
+
+```
+factor = mean(actual / estimated) + confidence x (stdDev / sqrt(n))
+```
+
+With few measurements that interval is wide and the correction is cautious in
+the expensive direction. As measurements accumulate it narrows onto the truth,
+so a model that genuinely costs _less_ than its listed price is eventually
+corrected downward too. The conservatism is in the bound, not in a refusal to
+ever lower a price.
+
+### What it will not do
+
+- **Move anything below `minimumMeasuredAttempts`.** One surprising invoice is
+  not a correction factor.
+- **Count an attempt whose usage was never reported.** Some agents report none
+  at all; counting those would compare a number with itself and drag every
+  factor toward 1.
+- **Exceed `maxFactor`**, or produce a zero or negative price from corrupt data.
+
+A correction that moved a decision is named in `routepilot route --explain`, so
+a projection that differs from your price table says why.
+
+Unlike exploration, this spends nothing to learn — it re-reads what was already
+paid — which is why it defaults to on.
+
+---
+
 ## Budgets
 
 ```jsonc

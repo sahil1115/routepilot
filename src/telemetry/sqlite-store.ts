@@ -465,15 +465,24 @@ export class SqliteTelemetryStore
   costReconciliation(): readonly CostReconciliation[] {
     const rows = this.#db
       .prepare(
+        // The per-attempt ratio sums are what a confidence interval needs. They
+        // are aggregated here rather than returning every row, so a long
+        // history does not have to be read into memory to price one request.
+        // `estimated_cost > 0` guards the division: a zero projection has no
+        // ratio, and including it would produce Infinity.
         `SELECT reconciliation.model_id,
                 COUNT(*) AS measured_attempts,
                 SUM(reconciliation.estimated_cost) AS estimated_cost,
-                SUM(attempts.cost) AS actual_cost
+                SUM(attempts.cost) AS actual_cost,
+                SUM(attempts.cost / reconciliation.estimated_cost) AS sum_ratio,
+                SUM((attempts.cost / reconciliation.estimated_cost)
+                    * (attempts.cost / reconciliation.estimated_cost)) AS sum_squared_ratio
            FROM attempt_cost_reconciliation AS reconciliation
            JOIN attempts
              ON attempts.request_id = reconciliation.request_id
             AND attempts.attempt_index = reconciliation.attempt_index
           WHERE reconciliation.cost_source = 'reported-usage'
+            AND reconciliation.estimated_cost > 0
           GROUP BY reconciliation.model_id
           ORDER BY reconciliation.model_id ASC`,
       )
@@ -482,16 +491,33 @@ export class SqliteTelemetryStore
       measured_attempts: number;
       estimated_cost: number;
       actual_cost: number;
+      sum_ratio: number;
+      sum_squared_ratio: number;
     }>;
 
-    return rows.map((row) => ({
-      modelId: row.model_id,
-      measuredAttempts: row.measured_attempts,
-      estimatedCost: row.estimated_cost,
-      actualCost: row.actual_cost,
-      difference: row.actual_cost - row.estimated_cost,
-      correctionFactor: row.estimated_cost > 0 ? row.actual_cost / row.estimated_cost : null,
-    }));
+    return rows.map((row) => {
+      const n = row.measured_attempts;
+      const meanRatio = n > 0 ? row.sum_ratio / n : null;
+
+      // Sample variance from the aggregate sums. Clamped at zero because
+      // floating-point subtraction of two large sums can land fractionally
+      // below it, and a negative variance has no square root.
+      const variance =
+        n > 1 && meanRatio !== null
+          ? Math.max(0, (row.sum_squared_ratio - n * meanRatio * meanRatio) / (n - 1))
+          : null;
+
+      return {
+        modelId: row.model_id,
+        measuredAttempts: n,
+        estimatedCost: row.estimated_cost,
+        actualCost: row.actual_cost,
+        difference: row.actual_cost - row.estimated_cost,
+        correctionFactor: row.estimated_cost > 0 ? row.actual_cost / row.estimated_cost : null,
+        meanRatio,
+        ratioStdDev: variance === null ? null : Math.sqrt(variance),
+      };
+    });
   }
 
   recentOutcomes(limit: number): readonly OutcomeRecord[] {

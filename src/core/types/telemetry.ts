@@ -124,6 +124,21 @@ export interface CostReconciliation {
   readonly actualCost: number;
   readonly difference: number;
   readonly correctionFactor: number | null;
+  /**
+   * Mean of the per-attempt `actual / estimated` ratios.
+   *
+   * Distinct from `correctionFactor`, which is the ratio of the *sums* and so
+   * weights expensive attempts more heavily. Calibration wants the mean of the
+   * ratios, because that is the quantity a confidence interval is built on.
+   */
+  readonly meanRatio: number | null;
+  /**
+   * Sample standard deviation of those ratios, or `null` below two attempts.
+   *
+   * `null` rather than 0: one measurement has no spread, and reporting zero
+   * would claim certainty from a single point.
+   */
+  readonly ratioStdDev: number | null;
 }
 
 /**

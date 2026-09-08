@@ -19,6 +19,8 @@
  */
 
 import { priceModelTokens, isComparableCurrency } from '../pricing.js';
+import { COST_CALIBRATION_DISABLED, CostCalibration } from './cost-calibration.js';
+import type { CostCorrection } from '../types/routing.js';
 import { expectedCostToSuccess } from './expected-cost.js';
 import type { RoutingFeatures } from '../types/features.js';
 import type { ModelSpec } from '../types/model.js';
@@ -37,10 +39,23 @@ export interface CostedCandidate {
   readonly cost: CostProjection;
   /** The model this one escalates to on failure, or null if it is the strongest. */
   readonly escalationTargetId: string | null;
+  /** How measured spend corrected this model's price, when it did. */
+  readonly correction: CostCorrection;
 }
 
 /** Computes expected total cost to success for a set of candidates. */
 export class CostEstimator {
+  readonly #calibration: CostCalibration;
+
+  /**
+   * @param calibration Measured spend, used to correct configured prices.
+   *   Absent means prices are taken as written, which is the behaviour before
+   *   any run has been recorded and the behaviour when calibration is off.
+   */
+  constructor(calibration: CostCalibration = new CostCalibration([], COST_CALIBRATION_DISABLED)) {
+    this.#calibration = calibration;
+  }
+
   /**
    * Cost every candidate, resolving escalation targets among them.
    *
@@ -81,7 +96,13 @@ export class CostEstimator {
       const candidate = ordered[i];
       if (candidate === undefined) continue;
 
-      const initial = priceModelTokens(candidate.model, usage).totalCost;
+      // The configured price is a prior. Where measured spend disagrees with it
+      // often enough to be believed, the projection is corrected upward to the
+      // safe end of the interval -- see `cost-calibration.ts` for why the bound
+      // rather than the mean.
+      const listPrice = priceModelTokens(candidate.model, usage).totalCost;
+      const correction = this.#calibration.correctionFor(candidate.model.id);
+      const initial = listPrice * correction.factor;
 
       // Candidates already processed are strictly stronger and already costed,
       // so the shared rule can rank them on expected cost -- the same rule the
@@ -112,6 +133,7 @@ export class CostEstimator {
       });
 
       results.set(candidate.model.id, {
+        correction,
         modelId: candidate.model.id,
         cost: { ...breakdown, currency: candidate.model.pricing.currency },
         escalationTargetId: targetId,
