@@ -38,6 +38,8 @@ what it expects to cost.
 >   are excluded rather than counted as agreeing. The factor then **corrects the
 >   projection routing acts on**, priced at the upper end of a confidence
 >   interval so that being wrong costs a dearer model rather than an overspend.
+>   Observed firing on 2026-09-09: six real runs measured usage at 0.68x the
+>   configured price, and the sixth was routed at a corrected 0.79x.
 > - **Escalation between models has still not happened for real**, and no real
 >   task has been driven through the direct adapter beyond a few tokens of plain
 >   text.
@@ -228,10 +230,12 @@ The ones that would matter most if you were considering using this:
 7. **Costs are measured only where an adapter reports usage.** Claude Code and
    the direct provider do; Cursor reports none, so its figures stay estimates.
    Every latency figure is still an estimate.
-8. **Cost correction has never fired on real data.** It is covered by tests and
-   wired into routing, but it needs five measured attempts on one model before
-   it moves anything, and no run has accumulated that yet. Until it does, prices
-   are used exactly as configured.
+8. **Cost correction is proven on six real runs, not in production use.** On
+   2026-09-09 six `run --execute` passes against Claude Code accumulated
+   measured usage; the sixth was corrected to 0.79x and its projection moved.
+   Real usage ran at 0.68x the configured price, and the bound sat above that
+   mean — conservative, as designed. Six runs on one model is evidence that the
+   mechanism works, not that any particular price table is right.
 
 ---
 

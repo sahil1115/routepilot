@@ -249,10 +249,25 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
     ...(args.minSuccess === undefined ? {} : { minimumSuccessProbability: args.minSuccess }),
   };
 
+  // Opened before routing, not after it. `run --execute` is the command that
+  // *produces* the cost measurements, and it was routing without ever reading
+  // them -- so calibration could never fire on the one path that feeds it.
+  const store = await openTelemetryStore({
+    enabled: loaded.config.telemetry.enabled,
+    ...(loaded.config.telemetry.storagePath === undefined
+      ? {}
+      : { storagePath: loaded.config.telemetry.storagePath }),
+    workspaceRoot: root,
+    onProblem: (message) => {
+      io.err(`Note: ${message}`);
+    },
+  });
+
   const route = await routeTask({
     onProblem: (message) => {
       io.err(`Warning: ${message}`);
     },
+    learningStore: store,
     prompt,
     root,
     level: args.level ?? chooseAnalysisLevel(new TaskClassifier().classify({ prompt })),
@@ -267,20 +282,6 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
   // The store is opened for a run that will execute, because that is the only
   // path that produces an outcome worth recording. A plan changes nothing and
   // has nothing to say.
-  const store =
-    args.execute && loaded.config.telemetry.enabled
-      ? await openTelemetryStore({
-          enabled: loaded.config.telemetry.enabled,
-          ...(loaded.config.telemetry.storagePath === undefined
-            ? {}
-            : { storagePath: loaded.config.telemetry.storagePath }),
-          workspaceRoot: root,
-          onProblem: (message) => {
-            io.err(`Note: ${message}`);
-          },
-        })
-      : undefined;
-
   const result = await runTask({
     route,
     config: loaded.config,
@@ -288,7 +289,10 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
     task: prompt,
     execute: args.execute,
     allowOverBudget: args.allowOverBudget,
-    ...(store === undefined ? {} : { store }),
+    // Recording stays gated on execution: a plan changes nothing and has
+    // nothing to say. Reading, above, is not gated -- an accurate plan wants
+    // the measured prices too.
+    ...(args.execute ? { store } : {}),
     onProblem: (message) => {
       io.err(`Note: ${message}`);
     },
@@ -313,7 +317,7 @@ async function commandRun(args: CliArgs, io: CliIO): Promise<number> {
     io.out(renderRun(result));
   }
 
-  store?.close();
+  store.close();
 
   return exitCodeForRun(result);
 }
@@ -362,23 +366,25 @@ async function commandRoute(args: CliArgs, io: CliIO): Promise<number> {
     ...(args.minSuccess === undefined ? {} : { minimumSuccessProbability: args.minSuccess }),
   };
 
-  // Learned statistics and shadow decisions live in the same local store as
-  // telemetry. It is opened when **either** feature needs it — they are
-  // independent, and gating the store on learning alone silently stopped
-  // shadow routing recording anything.
-  const needsStore = loaded.config.learning.enabled || loaded.config.shadow.enabled;
-  const learningStore = needsStore
-    ? await openTelemetryStore({
-        enabled: loaded.config.telemetry.enabled,
-        ...(loaded.config.telemetry.storagePath === undefined
-          ? {}
-          : { storagePath: loaded.config.telemetry.storagePath }),
-        workspaceRoot: args.root ?? process.cwd(),
-        onProblem: (message) => {
-          io.err(`Note: ${message}`);
-        },
-      })
-    : undefined;
+  // Learned statistics, shadow decisions and measured spend all live in the
+  // same local store. This used to enumerate the features that needed it, and
+  // that list rotted twice -- first when shadow routing was added and recorded
+  // nothing, then when cost calibration was added and never saw a measurement.
+  //
+  // So it is no longer a list. The store is opened whenever telemetry is on,
+  // and `openTelemetryStore` already returns a null store when it is off or
+  // unavailable, so a new consumer cannot be starved by forgetting to add
+  // itself here.
+  const learningStore = await openTelemetryStore({
+    enabled: loaded.config.telemetry.enabled,
+    ...(loaded.config.telemetry.storagePath === undefined
+      ? {}
+      : { storagePath: loaded.config.telemetry.storagePath }),
+    workspaceRoot: args.root ?? process.cwd(),
+    onProblem: (message) => {
+      io.err(`Note: ${message}`);
+    },
+  });
 
   const result = await routeTask({
     onProblem: (message) => {
@@ -386,7 +392,7 @@ async function commandRoute(args: CliArgs, io: CliIO): Promise<number> {
     },
     prompt,
     root: args.root ?? process.cwd(),
-    ...(learningStore === undefined ? {} : { learningStore }),
+    learningStore,
     level: args.level ?? chooseAnalysisLevel(new TaskClassifier().classify({ prompt })),
     config: loaded.config,
     ...(args.activeFile === undefined ? {} : { activeFile: args.activeFile }),
@@ -399,7 +405,7 @@ async function commandRoute(args: CliArgs, io: CliIO): Promise<number> {
   // Shadow decisions are recorded, never executed. The request id is a stable
   // hash of the task and workspace, so re-running the same `routepilot route`
   // replaces its row rather than inflating the agreement statistics.
-  if (result.shadow !== null && learningStore !== undefined) {
+  if (result.shadow !== null) {
     learningStore.recordShadowDecisions(
       toShadowRecords(
         result.shadow,
@@ -409,7 +415,7 @@ async function commandRoute(args: CliArgs, io: CliIO): Promise<number> {
     );
   }
 
-  learningStore?.close();
+  learningStore.close();
 
   if (args.flags.has('json')) {
     io.out(

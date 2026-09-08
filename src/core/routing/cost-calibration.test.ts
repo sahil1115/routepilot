@@ -8,6 +8,10 @@
  * `maxEscalationsPerTask` in this repository.
  */
 
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -27,6 +31,8 @@ import { EXPLORATION_DISABLED } from '../bandit/exploration-gate.js';
 import { LearnedSuccessModel } from '../learning/success-model.js';
 import { ModelRegistry } from '../registry/model-registry.js';
 import { RoutingEngine } from './routing-engine.js';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 /**
  * A measured model.
@@ -269,5 +275,35 @@ describe('a corrected price is auditable', () => {
 
     expect(decision.evaluations.every((e) => e.costCorrection === undefined)).toBe(true);
     expect(decision.explanation.join(' ')).not.toContain('price corrected');
+  });
+});
+
+describe('the wiring that feeds calibration cannot rot silently', () => {
+  it('the run command opens its store before routing, not after', async () => {
+    // `run --execute` produces the cost measurements. It was opening the store
+    // *after* routing, so the one command that feeds calibration routed without
+    // ever reading it. Asserted against the source because the ordering is the
+    // defect -- a test that called the command would pass either way once the
+    // store existed at all.
+    const source = await readFile(join(root, 'src', 'cli', 'main.ts'), 'utf8');
+    const command = source.slice(source.indexOf('async function commandRun'));
+
+    const opened = command.indexOf('openTelemetryStore');
+    const routed = command.indexOf('await routeTask(');
+
+    expect(opened).toBeGreaterThan(-1);
+    expect(routed).toBeGreaterThan(-1);
+    expect(opened, 'the store must be opened before routeTask is called').toBeLessThan(routed);
+    expect(command.slice(0, routed + 400)).toContain('learningStore: store');
+  });
+
+  it('does not gate the store on an enumerated list of features', async () => {
+    // That list rotted twice: shadow routing recorded nothing when it was added,
+    // and calibration saw no measurements when it was. `openTelemetryStore`
+    // already degrades to a null store, so the gate bought nothing and cost a
+    // silent failure each time a consumer was added.
+    const source = await readFile(join(root, 'src', 'cli', 'main.ts'), 'utf8');
+
+    expect(source).not.toContain('const needsStore');
   });
 });
