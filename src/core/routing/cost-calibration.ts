@@ -1,14 +1,28 @@
 /**
- * Correcting a stale price with measured spend (spec sections 14 and 15).
+ * Correcting a projection with measured spend (spec sections 14 and 15).
  *
- * Configured prices are priors. They are typed by a human, they go out of date,
- * and every routing decision multiplies by them — so a stale table produces
- * confidently wrong routing no matter how good the success model is.
+ * Every routing decision multiplies by a projected cost, and that projection is
+ * two guesses stacked: how many tokens a task will take, and what a token
+ * costs. Either being wrong produces confidently wrong routing no matter how
+ * good the success model is.
  *
  * Where an adapter reports token usage, the telemetry store already records
  * what an attempt was projected to cost and what that usage actually priced at.
  * This turns those pairs into a per-model correction factor and applies it to
  * the projection.
+ *
+ * ## What it measures, precisely
+ *
+ * **Token-estimate error, not price error.** Both sides of the ratio are priced
+ * with the same configured table, so the price cancels: double the configured
+ * price and projection and outcome double together, leaving the ratio
+ * unchanged. What survives is the gap between estimated and actual token
+ * counts, which is the coarser of the two guesses -- `estimateOutputTokens` is
+ * an admitted heuristic.
+ *
+ * Detecting a *stale price* needs a source of truth for what was actually
+ * charged, which no adapter reports. That is a separate factor and is not
+ * implemented.
  *
  * ## Why an upper bound rather than the mean
  *

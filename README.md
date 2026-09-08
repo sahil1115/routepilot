@@ -8,46 +8,52 @@ what it expects to cost.
 
 > ### Status: honest about what it is
 >
-> RoutePilot **routes, runs, and edits code**. Both agent adapters have been
-> driven through real coding tasks and checked against the filesystem.
+> RoutePilot **routes, runs, and edits code**. Every adapter has been driven
+> against its real tool, and the whole loop has been driven end to end.
 >
-> - The pipeline is complete and tested — 1439 tests across 69 files, and
->   `npm run gate` maps every quality-gate item to the evidence for it.
-> - **Both agent adapters are verified against their real tools**: Claude Code
->   2.1.72 and Cursor CLI 2026.09.02. On 2026-09-04 each scored **4/4** on the
->   same fixture suite — fixing a failing test suite, creating a file, declining
->   to fabricate a missing one, and cancelling mid-run. Every assertion observed
->   the filesystem or the process, never the transcript.
-> - **Claude Code needs a permission mode to write.** With none set it scores
->   2/4: print mode cannot prompt, so every edit is declined. Set
->   `agents."claude-code".permissionMode` to `acceptEdits`. RoutePilot passes no
->   mode by default and will not widen your permissions for you.
+> **What works, and how that was shown**
+>
+> - **Both coding agents are verified against their real tools.** Claude Code
+>   2.1.72 and Cursor CLI 2026.09.02 each scored **4/4** on the same fixture
+>   suite on 2026-09-04 — fixing a failing test suite, creating a file,
+>   declining to fabricate a missing one, and cancelling mid-run. Every
+>   assertion observed the filesystem or the process, never the transcript.
 > - **The direct HTTP adapter is verified too**, on 2026-09-06 against the
 >   Anthropic Messages API: 4/4, including a real streamed request reporting
->   token usage. One protocol is written and proven; every other provider still
->   needs its own, and none ships. See [docs/DIRECT_PROVIDER.md](docs/DIRECT_PROVIDER.md).
-> - **The whole loop is verified end to end** (2026-09-08): a real agent fixed a
+>   token usage. See [docs/DIRECT_PROVIDER.md](docs/DIRECT_PROVIDER.md).
+> - **The whole loop works end to end** (2026-09-08). A real agent fixed a
 >   fixture, RoutePilot ran the workspace's own tests, and the run reported
->   `succeeded` with the outcome recorded and learned from. That first run also
->   found a real defect — on Windows every validation command failed to start,
->   so every run reported `unverified`. Fixed.
-> - **Actual spend is now reconciled against the estimate** where an adapter
->   reports token usage. Each attempt records what was projected, what the usage
->   actually priced at, and which of the two the figure came from, so a
->   per-model correction factor can be measured. Attempts with no reported usage
->   are excluded rather than counted as agreeing. The factor then **corrects the
->   projection routing acts on**, priced at the upper end of a confidence
->   interval so that being wrong costs a dearer model rather than an overspend.
->   Observed firing on 2026-09-09: six real runs measured usage at 0.68x the
->   configured price, and the sixth was routed at a corrected 0.79x.
-> - **Escalation between models has still not happened for real**, and no real
->   task has been driven through the direct adapter beyond a few tokens of plain
->   text.
-> - **A run reports `unverified` unless your workspace declares test, build or
->   typecheck scripts.** RoutePilot will not call a task successful on the
->   agent's word alone.
-> - **The VS Code extension is verified in real VS Code** (1.136.0, Node
->   24.18.1): 8/8 extension-host checks plus 19 against a fake host.
+>   `succeeded` with the outcome recorded and learned from — routing, execution,
+>   validation, telemetry and learning in one pass. See
+>   [docs/RUN_LOOP.md](docs/RUN_LOOP.md).
+> - **Spend is measured, not only estimated.** Where an adapter reports token
+>   usage, each attempt records what was projected and what it actually cost,
+>   and the difference corrects the projection routing acts on — priced at the
+>   upper end of a confidence interval, so being wrong costs a dearer model
+>   rather than an overspend. Observed correcting a live decision on 2026-09-09.
+> - **It will not claim a success it did not check.** A run reports `unverified`
+>   rather than `succeeded` when your workspace declares no test, build or
+>   typecheck script. RoutePilot never takes the agent's word for it.
+> - **The VS Code extension runs in real VS Code** (1.136.0, Node 24.18.1):
+>   8/8 extension-host checks, plus 19 against a fake host.
+> - **1456 tests across 70 files**, and `npm run gate` maps every quality-gate
+>   item to the evidence for it.
+>
+> **Still in progress**
+>
+> - **Escalation between models has not yet run for real.** The machinery is
+>   built and covered by tests; no real task has produced one. This is the
+>   largest remaining gap.
+> - **Claude Code needs a permission mode to write.** With none set it scores
+>   2/4, because print mode cannot prompt and every edit is declined. Set
+>   `agents."claude-code".permissionMode` to `acceptEdits`. RoutePilot passes no
+>   mode by default and will not widen your permissions for you.
+> - **One provider protocol ships.** The direct adapter is proven against
+>   Anthropic; every other provider needs its own.
+> - **Cost correction is proven on six runs, not in production use**, and it
+>   currently measures token-estimate error rather than a stale price — both
+>   sides of the ratio use the same configured price table, so the price
+>   cancels out.
 >
 > Every one of those is stated wherever it matters, not only here. See
 > [Limitations](#limitations).

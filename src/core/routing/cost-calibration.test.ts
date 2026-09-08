@@ -1,5 +1,5 @@
 /**
- * Correcting a stale price with measured spend.
+ * Correcting a projection with measured spend.
  *
  * The half that changes behaviour. Recording what an attempt actually cost is
  * worth nothing on its own: v0.9.1 shipped the measurement and no routing
@@ -218,7 +218,7 @@ describe('the correction reaches the expected-cost projection', () => {
   });
 
   it('can change which model is cheapest', () => {
-    // The whole point: a stale price that routing believed is corrected, and
+    // The whole point: a projection routing believed is corrected, and
     // the decision moves with it.
     const cheap = cheapModel();
     const medium = mediumModel();

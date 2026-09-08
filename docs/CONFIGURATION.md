@@ -207,13 +207,22 @@ first two were validated and then ignored in favour of built-in defaults.
 
 ## Cost calibration
 
-Configured prices are priors. They are typed by a human, they go out of date,
-and every routing decision multiplies by them — so a stale table produces
-confidently wrong routing however good the success model is.
+Every routing decision multiplies by a projected cost, and that projection is
+two guesses stacked: how many tokens a task will take, and what a token costs.
+Either being wrong produces confidently wrong routing however good the success
+model is.
 
 Where an adapter reports token usage, RoutePilot records what an attempt was
 projected to cost and what that usage actually priced at, and corrects the
 projection from the difference.
+
+**It measures token-estimate error, not price error.** Both sides of the ratio
+are priced with the same configured table, so the price cancels out — double
+your prices and projection and outcome double together. What survives is the
+gap between estimated and actual token counts, which is the coarser guess.
+Detecting a stale _price_ would need a source of truth for what you were
+actually charged, which no adapter reports; that is a separate factor and is
+not implemented.
 
 ```jsonc
 "costCalibration": {
