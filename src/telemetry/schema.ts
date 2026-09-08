@@ -281,6 +281,25 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_learned_model ON learned_success (model_id)`,
     ],
   },
+  {
+    version: 7,
+    description: 'estimated versus measured attempt cost reconciliation',
+    statements: [
+      // Kept separate from attempts because SQLite has no idempotent
+      // ADD COLUMN. Older attempt rows are intentionally absent: their cost
+      // provenance was not recorded, so calling it measured would be false.
+      `CREATE TABLE IF NOT EXISTS attempt_cost_reconciliation (
+        request_id TEXT NOT NULL,
+        attempt_index INTEGER NOT NULL,
+        model_id TEXT NOT NULL,
+        estimated_cost REAL NOT NULL,
+        cost_source TEXT NOT NULL,
+        PRIMARY KEY (request_id, attempt_index)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_attempts_cost_source
+         ON attempt_cost_reconciliation (model_id, cost_source)`,
+    ],
+  },
 ];
 
 /** The schema version this build expects. */

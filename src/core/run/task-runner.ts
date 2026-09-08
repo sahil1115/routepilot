@@ -383,6 +383,9 @@ export class TaskRunner {
     const durationMs = this.#clock.now() - startedAt;
     const struggle = this.#struggle.assess(signals);
 
+    const estimatedCost = this.#estimate(model, request);
+    const usage = outcome.result.usage ?? null;
+
     return {
       record: {
         index,
@@ -391,7 +394,9 @@ export class TaskRunner {
         succeeded,
         failureType: succeeded ? null : classification.failureType,
         failureReason: succeeded ? null : classification.reason,
+        estimatedCost,
         cost: this.#cost(model, outcome, request),
+        usage,
         durationMs,
         changedFiles: outcome.result.changedFiles,
         failedChecks: failedChecks(validation),

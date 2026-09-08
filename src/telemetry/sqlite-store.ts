@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 import type {
   ExecutionAttemptRecord,
   CandidateRecord,
+  CostReconciliation,
   EscalationRecord,
   EventRecord,
   OutcomeRecord,
@@ -329,6 +330,15 @@ export class SqliteTelemetryStore
           record.struggleScore,
           record.modelAttributableStruggle,
         );
+      this.#db
+        .prepare(`INSERT OR REPLACE INTO attempt_cost_reconciliation VALUES (?,?,?,?,?)`)
+        .run(
+          record.requestId,
+          record.attemptIndex,
+          record.modelId,
+          record.estimatedCost,
+          record.costSource,
+        );
     });
   }
 
@@ -450,6 +460,38 @@ export class SqliteTelemetryStore
       .all(limit) as Record<string, unknown>[];
 
     return rows.map(toRoutingRecord);
+  }
+
+  costReconciliation(): readonly CostReconciliation[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT reconciliation.model_id,
+                COUNT(*) AS measured_attempts,
+                SUM(reconciliation.estimated_cost) AS estimated_cost,
+                SUM(attempts.cost) AS actual_cost
+           FROM attempt_cost_reconciliation AS reconciliation
+           JOIN attempts
+             ON attempts.request_id = reconciliation.request_id
+            AND attempts.attempt_index = reconciliation.attempt_index
+          WHERE reconciliation.cost_source = 'reported-usage'
+          GROUP BY reconciliation.model_id
+          ORDER BY reconciliation.model_id ASC`,
+      )
+      .all() as Array<{
+      model_id: string;
+      measured_attempts: number;
+      estimated_cost: number;
+      actual_cost: number;
+    }>;
+
+    return rows.map((row) => ({
+      modelId: row.model_id,
+      measuredAttempts: row.measured_attempts,
+      estimatedCost: row.estimated_cost,
+      actualCost: row.actual_cost,
+      difference: row.actual_cost - row.estimated_cost,
+      correctionFactor: row.estimated_cost > 0 ? row.actual_cost / row.estimated_cost : null,
+    }));
   }
 
   recentOutcomes(limit: number): readonly OutcomeRecord[] {

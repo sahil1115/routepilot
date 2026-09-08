@@ -95,7 +95,12 @@ export interface ExecutionAttemptRecord {
   readonly failureType: FailureType | null;
   /** Redacted, truncated summary. Never a transcript. */
   readonly errorSummary: string | null;
+  /** Projection made before this attempt was started. */
+  readonly estimatedCost: number;
+  /** Actual priced usage when available, otherwise the projection. */
   readonly cost: number;
+  /** Whether cost was measured from provider usage or falls back to an estimate. */
+  readonly costSource: 'reported-usage' | 'estimate';
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
   readonly cachedInputTokens: number | null;
@@ -104,6 +109,21 @@ export interface ExecutionAttemptRecord {
   readonly filesChanged: number;
   readonly struggleScore: number;
   readonly modelAttributableStruggle: number;
+}
+
+/**
+ * Per-model comparison of the routing estimate with priced provider usage.
+ *
+ * Only attempts that actually reported usage contribute. A null correction
+ * factor means there is no measured basis for adjusting future estimates.
+ */
+export interface CostReconciliation {
+  readonly modelId: string;
+  readonly measuredAttempts: number;
+  readonly estimatedCost: number;
+  readonly actualCost: number;
+  readonly difference: number;
+  readonly correctionFactor: number | null;
 }
 
 /**
@@ -205,6 +225,8 @@ export interface TelemetryStore {
   recentOutcomes(limit: number): readonly OutcomeRecord[];
   /** Most recent routing decisions, newest first. */
   recentRouting(limit: number): readonly RoutingRecord[];
+  /** Compare projected spend with priced usage, grouped by model. */
+  costReconciliation(): readonly CostReconciliation[];
 
   close(): void;
 }

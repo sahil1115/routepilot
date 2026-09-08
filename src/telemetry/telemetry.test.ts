@@ -127,7 +127,9 @@ function attempt(overrides: Partial<ExecutionAttemptRecord> = {}): ExecutionAtte
     status: 'failed',
     failureType: 'TOOL_FAILURE',
     errorSummary: 'edit did not apply',
+    estimatedCost: 0.02,
     cost: 0.021,
+    costSource: 'reported-usage',
     inputTokens: 20_000,
     outputTokens: 3_800,
     cachedInputTokens: null,
@@ -234,6 +236,35 @@ describe('persistence', () => {
     store.close();
 
     expect(existsSync(store.path)).toBe(true);
+  });
+
+  it('reconciles only attempts with reported usage', async () => {
+    const store = await open();
+    store.recordAttempt(attempt());
+    store.recordAttempt(
+      attempt({
+        requestId: 'req-2',
+        attemptIndex: 0,
+        modelId: 'acme/estimated-only',
+        cost: 0.04,
+        estimatedCost: 0.04,
+        costSource: 'estimate',
+        inputTokens: null,
+        outputTokens: null,
+        cachedInputTokens: null,
+      }),
+    );
+
+    const [reconciliation] = store.costReconciliation();
+    expect(reconciliation).toMatchObject({
+      modelId: 'acme/balanced-1',
+      measuredAttempts: 1,
+      estimatedCost: 0.02,
+      actualCost: 0.021,
+      correctionFactor: 1.05,
+    });
+    expect(reconciliation?.difference).toBeCloseTo(0.001, 10);
+    store.close();
   });
 
   it('records cost, latency, failure type and escalation on the outcome', async () => {

@@ -11,7 +11,7 @@ what it expects to cost.
 > RoutePilot **routes, runs, and edits code**. Both agent adapters have been
 > driven through real coding tasks and checked against the filesystem.
 >
-> - The pipeline is complete and tested — 1372 tests across 64 files, and
+> - The pipeline is complete and tested — 1439 tests across 69 files, and
 >   `npm run gate` maps every quality-gate item to the evidence for it.
 > - **Both agent adapters are verified against their real tools**: Claude Code
 >   2.1.72 and Cursor CLI 2026.09.02. On 2026-09-04 each scored **4/4** on the
@@ -31,6 +31,12 @@ what it expects to cost.
 >   `succeeded` with the outcome recorded and learned from. That first run also
 >   found a real defect — on Windows every validation command failed to start,
 >   so every run reported `unverified`. Fixed.
+> - **Actual spend is now reconciled against the estimate** where an adapter
+>   reports token usage. Each attempt records what was projected, what the usage
+>   actually priced at, and which of the two the figure came from, so a
+>   per-model correction factor can be measured. Attempts with no reported usage
+>   are excluded rather than counted as agreeing. **The factor is recorded, not
+>   yet used** — routing still prices from the configured table.
 > - **Escalation between models has still not happened for real**, and no real
 >   task has been driven through the direct adapter beyond a few tokens of plain
 >   text.
@@ -218,7 +224,14 @@ The ones that would matter most if you were considering using this:
    and nothing records outcomes without a run command.
 6. **Prices and priors in the example config are typed by a human**, unverified
    against any provider, and wrong ones produce confidently wrong routing.
-7. **Every cost and latency figure is an estimate**, never a measurement.
+7. **Costs are measured only where an adapter reports usage.** Claude Code and
+   the direct provider do; Cursor reports none, so its figures stay estimates.
+   Every latency figure is still an estimate.
+8. **The cost correction factor changes nothing yet.** It is computed per model
+   from measured attempts and stored, but no routing decision reads it and no
+   CLI command displays it — `costReconciliation()` is reachable only through
+   the telemetry store API. Until routing consumes it, stale prices produce
+   confidently wrong routing exactly as before.
 
 ---
 

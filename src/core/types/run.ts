@@ -11,7 +11,7 @@
  * by a scripted executor with no process spawned.
  */
 
-import type { AgentEvent, AgentExecutionRequest, AgentResult } from './agent.js';
+import type { AgentEvent, AgentExecutionRequest, AgentResult, TokenUsage } from './agent.js';
 import type { FailureType } from './failure.js';
 import type { RoutingFeatures } from './features.js';
 import type { ModelSpec } from './model.js';
@@ -55,7 +55,15 @@ export interface RunAttempt {
   readonly failureType: FailureType | null;
   /** Why it failed, in one line. Redacted. */
   readonly failureReason: string | null;
+  /** The pre-execution price projection used to reserve/limit this attempt. */
+  readonly estimatedCost: number;
+  /**
+   * The price of reported token usage, or the estimate when the adapter did
+   * not report usage.  `usage` below says which of those two cases applies.
+   */
   readonly cost: number;
+  /** Reported token usage. Null is unknown, never a synthetic zero. */
+  readonly usage: TokenUsage | null;
   readonly durationMs: number;
   readonly changedFiles: readonly string[];
   /** Validation checks that failed on this attempt. */

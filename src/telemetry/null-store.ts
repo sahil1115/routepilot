@@ -21,6 +21,7 @@ import type {
   TelemetryStatistics,
   TelemetryStore,
   UserSignalRecord,
+  CostReconciliation,
 } from '../core/types/telemetry.js';
 
 /** Accepts every record and stores none. */
@@ -55,6 +56,10 @@ export class NullTelemetryStore
   }
 
   recentOutcomes(_limit: number): readonly OutcomeRecord[] {
+    return [];
+  }
+
+  costReconciliation(): readonly CostReconciliation[] {
     return [];
   }
 

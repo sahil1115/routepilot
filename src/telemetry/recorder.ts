@@ -170,12 +170,14 @@ function attemptRecord(
     status: attempt.succeeded ? 'completed' : 'failed',
     failureType: attempt.failureType,
     errorSummary: redactSummary(attempt.failureReason),
+    estimatedCost: attempt.estimatedCost,
     cost: attempt.cost,
-    // Absent, not zero: the adapters do not report token usage yet, and a zero
-    // here would be indistinguishable from a genuinely free call.
-    inputTokens: null,
-    outputTokens: null,
-    cachedInputTokens: null,
+    costSource: attempt.usage === null ? 'estimate' : 'reported-usage',
+    // Null means the adapter did not report usage. It is never converted to a
+    // zero, which would fabricate a free call and corrupt reconciliation.
+    inputTokens: attempt.usage?.inputTokens ?? null,
+    outputTokens: attempt.usage?.outputTokens ?? null,
+    cachedInputTokens: attempt.usage?.cachedInputTokens ?? null,
     toolCalls: attempt.toolCalls,
     toolFailures: attempt.toolFailures,
     filesChanged: attempt.changedFiles.length,
