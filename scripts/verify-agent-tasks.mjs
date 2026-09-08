@@ -92,52 +92,17 @@ if (id === 'claude-code' && process.env.CLAUDECODE) {
 // ---------------------------------------------------------------------------
 // The fixture repository
 //
-// Duplicated from `src/test-support/agent-fixture-repo.ts` rather than imported:
-// that module is excluded from the published build (`tsconfig.build.json`), so
-// `dist/` does not contain it. Keeping the files here means this script runs
-// against a plain `npm run build`.
+// Shared with `verify-run-loop.mjs` via `scripts/lib/fixture-repo.mjs`, which
+// duplicates `src/test-support/agent-fixture-repo.ts` because that module is
+// excluded from the published build and so is absent from `dist/`.
+// `src/test-support/fixture-parity.test.ts` holds the two copies together.
 // ---------------------------------------------------------------------------
 
-const FIXTURE_FILES = {
-  'package.json': `${JSON.stringify(
-    {
-      name: 'routepilot-agent-fixture',
-      version: '0.0.0',
-      private: true,
-      type: 'module',
-      scripts: { test: 'node test.mjs' },
-    },
-    null,
-    2,
-  )}\n`,
-  'src/calculator.mjs':
-    '/** Add two numbers. */\n' +
-    'export function add(a, b) {\n' +
-    '  return a - b;\n' +
-    '}\n\n' +
-    '/** Multiply two numbers. */\n' +
-    'export function multiply(a, b) {\n' +
-    '  return a * b;\n' +
-    '}\n',
-  'test.mjs':
-    "import assert from 'node:assert/strict';\n" +
-    "import { add, multiply } from './src/calculator.mjs';\n\n" +
-    "assert.equal(add(2, 3), 5, 'add(2, 3) should be 5');\n" +
-    "assert.equal(multiply(2, 3), 6, 'multiply(2, 3) should be 6');\n\n" +
-    "console.log('all tests passed');\n",
-  'README.md':
-    '# Fixture repository\n\nA throwaway workspace for verifying RoutePilot adapters.\n' +
-    'It contains one deliberate defect in `src/calculator.mjs`. Nothing here is real.\n',
-};
+const { createFixtureRepo } = await import('./lib/fixture-repo.mjs');
 
 async function makeFixture() {
-  const dir = join(tmpdir(), `routepilot-tasks-${String(process.pid)}-${String(Date.now())}`);
-  for (const [relative, contents] of Object.entries(FIXTURE_FILES)) {
-    const path = join(dir, relative);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, contents, 'utf8');
-  }
-  return dir;
+  const repo = await createFixtureRepo();
+  return repo.dir;
 }
 
 const read = (dir, relative) => readFile(join(dir, relative), 'utf8').catch(() => null);

@@ -26,8 +26,10 @@ afterEach(async () => {
   await Promise.all(created.splice(0).map((repo) => repo.cleanup()));
 });
 
-async function fixture(): Promise<AgentFixtureRepo> {
-  const repo = await createAgentFixtureRepo();
+async function fixture(
+  options: Parameters<typeof createAgentFixtureRepo>[0] = {},
+): Promise<AgentFixtureRepo> {
+  const repo = await createAgentFixtureRepo(options);
   created.push(repo);
   return repo;
 }
@@ -73,6 +75,44 @@ describe('the agent fixture repository', () => {
     expect(repo.dir.startsWith(tmpdir())).toBe(true);
     expect(repo.dir).not.toContain('routepilot\\src');
     expect(await repo.read('.env')).toBeNull();
+  });
+
+  it('can omit the test script, so a run has nothing to validate against', async () => {
+    // The workspace that forces the `unverified` outcome: RoutePilot derives
+    // its checks from the manifest's scripts, and this one declares none.
+    const repo = await fixture({ withoutTestScript: true });
+    const manifest = JSON.parse((await repo.read('package.json')) ?? '{}') as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(manifest.scripts).toEqual({});
+  });
+
+  it('still knows whether the work was done, even with no test script', async () => {
+    // The point of the variant is that *RoutePilot* cannot check, not that
+    // nobody can. Without this the check would be unable to tell a real edit
+    // from no edit at all.
+    const repo = await fixture({ withoutTestScript: true });
+    expect((await repo.runTests()).passed).toBe(false);
+
+    const source = await repo.read('src/calculator.mjs');
+    await writeFile(
+      join(repo.dir, 'src', 'calculator.mjs'),
+      (source ?? '').replace('return a - b;', 'return a + b;'),
+      'utf8',
+    );
+
+    expect((await repo.runTests()).passed).toBe(true);
+  });
+
+  it('ships the test script by default', async () => {
+    // The positive control: the option must not change the default workspace.
+    const repo = await fixture();
+    const manifest = JSON.parse((await repo.read('package.json')) ?? '{}') as {
+      scripts?: Record<string, string>;
+    };
+
+    expect(manifest.scripts?.['test']).toBe('node test.mjs');
   });
 
   it('cleans up, and a locked directory does not throw', async () => {

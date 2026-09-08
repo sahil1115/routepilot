@@ -39,6 +39,7 @@ import { buildRegistries } from '../config/registries.js';
 import { toRoutingPolicy } from '../config/policy.js';
 import type { RoutePilotConfig } from '../config/types.js';
 import { NodeCommandRunner } from '../infra/node-command-runner.js';
+import { resolveNpmCommand } from '../infra/npm-command.js';
 import { block, money, renderTable } from './format.js';
 import type { RouteResult } from './route.js';
 
@@ -312,7 +313,10 @@ async function validationCommands(
   try {
     const raw = await readFile(join(workspaceRoot, 'package.json'), 'utf8');
     const manifest = JSON.parse(raw) as { scripts?: Record<string, string> };
-    const commands = commandsFromPackageScripts(manifest.scripts ?? {});
+    // The package manager is resolved for this platform, not assumed. On
+    // Windows a bare `npm` cannot be spawned without a shell, which made every
+    // derived check fail to start and every run report `unverified`.
+    const commands = commandsFromPackageScripts(manifest.scripts ?? {}, resolveNpmCommand());
 
     if (Object.keys(commands).length === 0) {
       onProblem?.(

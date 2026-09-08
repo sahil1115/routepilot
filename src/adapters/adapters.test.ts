@@ -34,7 +34,12 @@ import { DirectProviderAdapter, type FetchLike, type ProviderProtocol } from './
 import { FakeAgentAdapter } from './fake/adapter.js';
 import { AgentRegistry } from './registry.js';
 import { runProcess } from './process/runner.js';
-import { ADAPTER_VERIFICATION, isSupported, verificationFor } from './verification.js';
+import {
+  ADAPTER_VERIFICATION,
+  isSupported,
+  LOOP_VERIFICATION,
+  verificationFor,
+} from './verification.js';
 
 const stubs: StubCli[] = [];
 
@@ -1152,6 +1157,22 @@ describe('verification honesty (spec section 2, rule 20)', () => {
       'cursor-cli': 'verified',
       'direct-provider': 'verified',
     });
+  });
+
+  it('cannot claim the run loop is verified without evidence', () => {
+    // Same rule as an adapter, for the thing adapters do not cover: the seams
+    // between them. `verified` here would mean routing, execution, validation,
+    // recording and learning were observed in one real pass -- which is a much
+    // bigger claim than any single adapter's, so it needs the same proof.
+    if (LOOP_VERIFICATION.status === 'verified') {
+      expect(LOOP_VERIFICATION.evidence, 'a verified loop must carry evidence').toBeTruthy();
+      expect(LOOP_VERIFICATION.evidence?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(LOOP_VERIFICATION.evidence?.toolVersion).toMatch(/\d/);
+      expect(LOOP_VERIFICATION.evidence?.note.length).toBeGreaterThan(40);
+    } else {
+      expect(LOOP_VERIFICATION.howToVerify).toContain('verify:run-loop');
+      expect(LOOP_VERIFICATION.limitations.length).toBeGreaterThan(0);
+    }
   });
 
   it('names the tool version in the evidence of anything verified', () => {

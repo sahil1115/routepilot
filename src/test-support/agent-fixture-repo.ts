@@ -81,11 +81,45 @@ Nothing here is real. Do not add credentials or anything of value.
 `,
 };
 
+/** Options for {@link createAgentFixtureRepo}. */
+export interface AgentFixtureOptions {
+  /**
+   * Omit the `test` script from the generated `package.json`.
+   *
+   * `routepilot run` derives its validation commands from the workspace's own
+   * manifest scripts, so a repository with none cannot be checked and the run
+   * must report `unverified` rather than taking the agent's word. This produces
+   * that workspace.
+   *
+   * `test.mjs` is still written, so the fixture's own `runTests()` can tell
+   * whether the agent did the work even though RoutePilot could not.
+   */
+  readonly withoutTestScript?: boolean | undefined;
+}
+
 /** Create the fixture in a fresh temporary directory. */
-export async function createAgentFixtureRepo(): Promise<AgentFixtureRepo> {
+export async function createAgentFixtureRepo(
+  options: AgentFixtureOptions = {},
+): Promise<AgentFixtureRepo> {
   const dir = await mkdtemp(join(tmpdir(), 'routepilot-fixture-'));
 
-  for (const [relativePath, contents] of Object.entries(FILES)) {
+  const files: Record<string, string> = { ...FILES };
+  if (options.withoutTestScript === true) {
+    files['package.json'] = `${JSON.stringify(
+      {
+        name: 'routepilot-agent-fixture',
+        version: '0.0.0',
+        private: true,
+        type: 'module',
+        // No scripts at all: nothing for validation to derive a command from.
+        scripts: {},
+      },
+      null,
+      2,
+    )}\n`;
+  }
+
+  for (const [relativePath, contents] of Object.entries(files)) {
     const target = join(dir, relativePath);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, contents, 'utf8');

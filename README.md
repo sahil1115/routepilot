@@ -26,9 +26,14 @@ what it expects to cost.
 >   Anthropic Messages API: 4/4, including a real streamed request reporting
 >   token usage. One protocol is written and proven; every other provider still
 >   needs its own, and none ships. See [docs/DIRECT_PROVIDER.md](docs/DIRECT_PROVIDER.md).
-> - **Escalation between models has not been exercised against real agents**,
->   and no real task has yet been driven through the direct adapter beyond a
->   few tokens of plain text.
+> - **The whole loop is verified end to end** (2026-09-08): a real agent fixed a
+>   fixture, RoutePilot ran the workspace's own tests, and the run reported
+>   `succeeded` with the outcome recorded and learned from. That first run also
+>   found a real defect — on Windows every validation command failed to start,
+>   so every run reported `unverified`. Fixed.
+> - **Escalation between models has still not happened for real**, and no real
+>   task has been driven through the direct adapter beyond a few tokens of plain
+>   text.
 > - **A run reports `unverified` unless your workspace declares test, build or
 >   typecheck scripts.** RoutePilot will not call a task successful on the
 >   agent's word alone.
@@ -193,14 +198,16 @@ Requires Node ≥ 20.11.
 
 The ones that would matter most if you were considering using this:
 
-1. **`routepilot run --execute` has never been run against a real agent.** This
-   is the largest remaining gap. The adapters are verified by driving them
-   directly; the command that routes, runs, validates and escalates around them
-   still has only a scripted executor behind every end-to-end assertion.
-2. **Escalation between models has never happened for real.** It is a
-   `TaskRunner` decision across two attempts, and no real run has produced one.
-   Cursor also reports no token usage, so its costs are estimates rather than
-   measurements.
+1. **Escalation between models has never happened for real.** This is now the
+   largest remaining gap. It is a `TaskRunner` decision across two attempts, and
+   no real run has produced one — the fixture ships a failing test, so it cannot
+   trigger the one classification that escalates. Cursor also reports no token
+   usage, so its costs are estimates rather than measurements.
+2. **The loop is verified on Windows, through Claude Code, once.** Six checks
+   passed end to end on 2026-09-08 — see
+   [docs/RUN_LOOP.md](docs/RUN_LOOP.md). Budget enforcement across real
+   attempts, retry and provider fallback against a real agent, and any other
+   platform remain unconfirmed.
 3. **The direct provider is verified for one provider and one shape.** Anthropic
    only, and a few tokens of plain text — no tool use, no structured output, no
    long or interrupted streams. Every other provider needs its own

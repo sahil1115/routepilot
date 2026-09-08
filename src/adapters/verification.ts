@@ -39,6 +39,29 @@ export interface VerificationEvidence {
   readonly note: string;
 }
 
+/**
+ * What is known about the run loop working end to end.
+ *
+ * Adapters are verified one at a time, in isolation. That leaves the seams
+ * between them unverified: `RegistryExecutor` bridging the task runner to an
+ * adapter, validation running against a workspace a real agent just edited, an
+ * outcome derived from that, telemetry written from a real run, and learning
+ * fed by it. Every component can work while the loop does not.
+ *
+ * Reuses {@link VerificationStatus} and {@link VerificationEvidence}, and obeys
+ * the same rule: `verified` requires evidence, and a test enforces the pairing.
+ */
+export interface LoopVerification {
+  readonly status: VerificationStatus;
+  /** What the loop is, in terms of the code that runs it. */
+  readonly mechanism: string;
+  /** Exact command a user can run to verify it. */
+  readonly howToVerify: string;
+  /** Required when, and only when, status is `verified`. */
+  readonly evidence?: VerificationEvidence | undefined;
+  readonly limitations: readonly string[];
+}
+
 /** What is known about one adapter. */
 export interface AdapterVerification {
   readonly adapterId: string;
@@ -255,3 +278,51 @@ export function describeVerification(entry: AdapterVerification): string {
       return 'implemented, never run against the real tool';
   }
 }
+
+/**
+ * What is known about `routepilot run --execute` working end to end.
+ *
+ * Starts `unverified` and is updated only from the machine-written report at
+ * `.routepilot/run-loop-verification.json`, never from expectation.
+ */
+export const LOOP_VERIFICATION: LoopVerification = {
+  status: 'verified',
+  mechanism:
+    'The production path: routeTask() decides, runTask() hands that decision to ' +
+    'TaskRunner, RegistryExecutor drives a real adapter, and the workspace’s own ' +
+    'manifest scripts are run as validation afterwards. The outcome, telemetry ' +
+    'and learning all derive from that single pass.',
+  howToVerify:
+    'From a terminal: npm run verify:run-loop -- --model anthropic/haiku ' +
+    '--permission-mode acceptEdits',
+  evidence: {
+    date: '2026-09-08',
+    toolVersion: 'Claude Code 2.1.72',
+    note:
+      'All six checks passed on Windows, Node 22.18.0, driving claude-haiku-4-5 ' +
+      'through routeTask() and runTask() with --permission-mode acceptEdits. A real ' +
+      'agent fixed the fixture, RoutePilot ran the workspace’s own npm test, and the ' +
+      'run reported `succeeded` with testsPassed=true, taskCriteriaMet=true and ' +
+      'evidence=0.5 -- one request, one attempt and one outcome in SQLite, and one ' +
+      'learned observation. A workspace declaring no scripts reported `unverified` ' +
+      'with taskCriteriaMet null even though the agent had done the work. Recorded ' +
+      'from .routepilot/run-loop-verification.json, not from a transcript.',
+  },
+  limitations: [
+    'FOUND BY THIS: on Windows every validation command failed to start, because ' +
+      'they are all `npm run <script>` and `execFile` cannot launch `npm.cmd` without ' +
+      'a shell. Every check reported "not run", so every `run --execute` reported ' +
+      '`unverified` regardless of what the agent did. Fixed by ' +
+      '`src/infra/npm-command.ts`; the first end-to-end run is what surfaced it.',
+    'ESCALATION HAS STILL NEVER HAPPENED FOR REAL, and is now the largest gap. ' +
+      '`weakness.broke-validation` requires repositoryBrokenBeforeRun !== true and ' +
+      'the fixture ships a failing test, so this fixture cannot trigger a vertical ' +
+      'escalation. Closing it needs a fixture that starts passing plus a model that ' +
+      'reliably fails it, which is not deterministic.',
+    'NOT CONFIRMED: budget enforcement across real attempts, retry and provider ' +
+      'fallback against a real agent, and the loop on any platform other than ' +
+      'Windows.',
+    'Verified through Claude Code only. The same script accepts --adapter ' +
+      'cursor-cli, which has not been run.',
+  ],
+};

@@ -217,6 +217,16 @@ export class ValidationEngine {
 }
 
 /**
+ * How to invoke a package manager, when naming it is not enough.
+ *
+ * `args` are placed before the derived `run <script>` arguments.
+ */
+export interface PackageManagerCommand {
+  readonly command: string;
+  readonly args?: readonly string[] | undefined;
+}
+
+/**
  * Derive validation commands from a repository's own manifest scripts.
  *
  * Nothing is invented: a check is only configured when the repository actually
@@ -224,12 +234,20 @@ export class ValidationEngine {
  */
 export function commandsFromPackageScripts(
   scripts: Readonly<Record<string, string>>,
-  packageManager = 'npm',
+  packageManager: string | PackageManagerCommand = 'npm',
 ): ValidationCommands {
+  // A plain string is the common case. The object form exists because on
+  // Windows `npm` is a `.cmd` that cannot be spawned without a shell, so the
+  // caller has to supply Node plus npm's own entry point instead -- which needs
+  // leading arguments, not just a different command name. See
+  // `src/infra/npm-command.ts`.
+  const manager: PackageManagerCommand =
+    typeof packageManager === 'string' ? { command: packageManager, args: [] } : packageManager;
+
   const commands: ValidationCommands = {};
   const run = (script: string): CheckCommand => ({
-    command: packageManager,
-    args: ['run', script],
+    command: manager.command,
+    args: [...(manager.args ?? []), 'run', script],
   });
 
   const assign = (check: ValidationCheck, candidates: readonly string[]): void => {

@@ -41,6 +41,7 @@ const REQUIRED_DOCS = [
   'docs/ARCHITECTURE.md',
   'docs/ROADMAP.md',
   'docs/CONFIGURATION.md',
+  'docs/RUN_LOOP.md',
   'docs/INTEGRATIONS.md',
   'docs/CLAUDE_CODE.md',
   'docs/CURSOR.md',

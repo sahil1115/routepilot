@@ -53,8 +53,9 @@ and had drifted out of step with the code; it was corrected in Phase 9.
 | 23    | Re-inspection and plan                  | **Complete**              |
 | 24    | `run --execute` honours plan and budget | **Complete**              |
 | 25    | User-defined model fleet                | **Complete**              |
-| 26    | Offline policy evaluation               | Not started               |
-| 27    | Validation configuration                | Not started               |
+| 26    | End-to-end verification of the loop     | **Complete**              |
+| 27    | Offline policy evaluation               | Not started               |
+| 28    | Validation configuration                | Not started               |
 
 Phases 10 and 11 of the _original_ roadmap (validation engine, telemetry schema)
 were folded into Phases 6 and 8 respectively and are complete. Roadmap Phase 12
@@ -928,14 +929,43 @@ happen without revisiting the documentation.
 
 ---
 
-## Phase 27 — Validation configuration
+## Phase 26 — End-to-end verification of the loop (complete)
 
-Not started. See `docs/ARCHITECTURE.md` §4, item 1. Displaced from 25 when the
-model fleet took that number.
+An external review named the gap precisely: the adapters were verified and the
+router was verified, but the loop tying them together had never been exercised
+against reality. It was correct. `runTask()` was driven only by
+`FakeAgentAdapter` or a scripted executor, and `verify-agent-tasks.mjs` called
+`adapter.execute` directly, bypassing `TaskRunner` entirely.
+
+`scripts/verify-run-loop.mjs` drives the production path. Six checks passed on
+2026-09-08 against Claude Code 2.1.72 — see `docs/RUN_LOOP.md`.
+
+**The first end-to-end run found a real defect, which is what it was for.**
+Validation commands are all `npm run <script>`, and on Windows `execFile` cannot
+launch `npm.cmd` without a shell — which `docs/SECURITY.md` forbids. Every check
+failed to start, `evaluated` was false, and **every `run --execute` on Windows
+reported `unverified` regardless of what the agent did.** The engine that exists
+to stop RoutePilot trusting an agent's own word could not run on that platform
+at all. Every unit test missed it because they inject a fake command runner.
+Fixed by `src/infra/npm-command.ts`, mirroring the existing Cursor Windows shim.
+
+The three fixture copies were also reduced to two, sharing
+`scripts/lib/fixture-repo.mjs`, with a parity test holding them together.
+
+**Escalation has still never happened for real** and is now the largest gap.
+`weakness.broke-validation` requires `repositoryBrokenBeforeRun !== true` and the
+fixture ships a failing test, so it cannot trigger a vertical escalation.
 
 ---
 
-## Phase 26 — Offline policy evaluation
+## Phase 28 — Validation configuration
+
+Not started. See `docs/ARCHITECTURE.md` §4, item 1. Displaced from 25 by the
+model fleet, and from 27 by this phase.
+
+---
+
+## Phase 27 — Offline policy evaluation
 
 - Policy replay against historical data (spec section 42). The comparison set
   itself is delivered — see Phase 12 — but replay against recorded _outcomes_
