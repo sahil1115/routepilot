@@ -86,8 +86,16 @@ export const MINIMUM_EVIDENCE = 0.25;
  */
 export const SUBSTANTIVE_CHECKS = ['build', 'tests'] as const;
 
-/** Whether any check that bears on the task produced a verdict. */
-function hasSubstantiveEvidence(outcome: TaskOutcome): boolean {
+/**
+ * Whether any check that bears on the task produced a verdict.
+ *
+ * Exported because calibration must apply the identical rule. The two gates --
+ * this one and `predictionFromDecision` -- were written to refuse the same
+ * things for the same reasons, and Phase 27 split them by adding a rule here
+ * and not there. Sharing the predicate is what stops that recurring; a comment
+ * claiming parity is what failed the first time.
+ */
+export function hasSubstantiveEvidence(outcome: TaskOutcome): boolean {
   return outcome.buildPassed !== null || outcome.testsPassed !== null;
 }
 

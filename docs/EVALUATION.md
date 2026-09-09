@@ -201,6 +201,20 @@ stages and routing overhead as a fraction of estimated model execution
 4. **No counterfactual outcome.** Shadow history cannot feed the learning
    engine, and using it that way would be exactly the fabrication the learning
    engine is careful to avoid.
-5. **In a real installation all three reports are empty**, because nothing
-   executes tasks. `routepilot calibration` and `routepilot shadow` say so
-   rather than showing zeros.
+5. **The reports are empty until enough tasks have run.** `routepilot
+calibration` and `routepilot shadow` say so rather than showing zeros, and
+   calibration needs 100 scored predictions before it reaches any verdict but
+   `unassessed`.
+
+   Two things are needed, and only one arrived in Phase 28. Predictions are now
+   recorded, but the safeguard scores only those whose source is `learned`, so a
+   default install with learning off accumulates `prior` rows that the gate
+   ignores by design. Calibration therefore stays `unassessed` until learning is
+   enabled and applied.
+
+   Until Phase 28 they were empty for a worse reason: nothing recorded a
+   prediction at all. `predictionFromDecision` and `recordPredictions` were both
+   built in Phase 11 and neither had a production caller, so the safeguard could
+   never fire. This limitation used to say the reports were empty "because
+   nothing executes tasks" — true when written, and stale from Phase 22, which
+   is how it concealed the real defect for six phases.

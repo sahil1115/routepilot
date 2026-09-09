@@ -225,6 +225,38 @@ describe('the adapter docs and the verification table cannot drift apart', () =>
     }
   });
 
+  it('the README capability table agrees with the verification record', async () => {
+    // It did not. The table called the direct HTTP adapter "implemented,
+    // unverified" while the README's own status section, and
+    // ADAPTER_VERIFICATION, both said verified on 2026-09-06. The guard above
+    // checks each adapter's own page and never looked at this table, so the
+    // README contradicted itself in two places a reader compares directly.
+    const readme = await readFile(join(root, 'README.md'), 'utf8');
+    const rows = readme
+      .split('\n')
+      .filter((line) => /^\|\s*Agent adapters:/.test(line))
+      .map((line) => line.toLowerCase());
+
+    expect(rows.length).toBeGreaterThan(0);
+
+    for (const entry of ADAPTER_VERIFICATION) {
+      if (entry.adapterId === 'fake') continue;
+      const name = entry.adapterId.split('-')[0] ?? '';
+      const row = rows.find((line) => line.includes(name));
+      if (row === undefined) continue; // adapters may share a row
+
+      if (entry.status === 'verified') {
+        expect(row, `the README table still calls ${entry.adapterId} unverified`).not.toMatch(
+          /\bunverified\b/,
+        );
+      } else {
+        expect(row, `the README table claims ${entry.adapterId} is verified`).not.toMatch(
+          /\*\*verified/,
+        );
+      }
+    }
+  });
+
   it('records which permission mode was verified for Claude Code', async () => {
     // This guard has tracked three states. It first asserted a *prediction* --
     // print mode cannot prompt, so a write may fail. On 2026-09-04 the fixture

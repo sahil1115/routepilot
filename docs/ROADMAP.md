@@ -55,8 +55,9 @@ and had drifted out of step with the code; it was corrected in Phase 9.
 | 25    | User-defined model fleet                | **Complete**              |
 | 26    | End-to-end verification of the loop     | **Complete**              |
 | 27    | Learning requires substantive evidence  | **Complete**              |
-| 28    | Validation configuration                | Not started               |
-| 29    | Offline policy evaluation               | Not started               |
+| 28    | The calibration safeguard actually runs | **Complete**              |
+| 29    | Validation configuration                | Not started               |
+| 30    | Offline policy evaluation               | Not started               |
 
 Phases 10 and 11 of the _original_ roadmap (validation engine, telemetry schema)
 were folded into Phases 6 and 8 respectively and are complete. Roadmap Phase 12
@@ -1021,14 +1022,87 @@ reachable evidence rather than half of it.
 
 ---
 
-## Phase 28 — Validation configuration
+## Phase 28 — The calibration safeguard actually runs (complete)
+
+A reviewer said calibration records were "not explicitly blocked" by Phase 27's
+new rule. Checking it found something worse: **no calibration record was ever
+produced at all.**
+
+`predictionFromDecision` and `store.recordPredictions` — both built in Phase 11,
+both fully tested — had no production caller. A whole-repository search outside
+tests returned the function definition, the interface declaration and the two
+store implementations, and nothing that called either. So
+`loadPredictions(2000, 'learned')` in `cli/route.ts` always came back empty, the
+gate always returned `NOT_ASSESSED`, and `routepilot calibration` could only ever
+print "no predictions have been scored yet". **The safeguard that exists to
+withdraw learned probabilities when they are measurably wrong could not reach any
+verdict but "unassessed", and nothing said so.**
+
+The seventh instance of "declared, plumbed, never set" in this repository, after
+`permissionMode`, `allowFallback`, `maxEscalationsPerTask`,
+`repositoryBrokenBeforeRun`, `userAccepted` and the cost-calibration store gate.
+Every unit test passed throughout, because the missing thing was a _call_.
+
+Recording now happens inside `recordRun`, not at the CLI call site, so no future
+caller can record a run and forget its prediction — the shape of the original
+defect. It stays best-effort and after the run: telemetry must never fail a task
+that already succeeded.
+
+**Phase 27 had also split the two admission gates.** `predictionFromDecision`
+carried the four rules learning had before 0.9.4 and a comment saying it refused
+"in the same cases learning refuses an observation, and for the same reasons".
+That stopped being true when the substantive-check rule was added to learning
+alone — so wiring calibration up as it stood would have scored predictions from
+runs learning refuses. Both now share `hasSubstantiveEvidence`, and a test runs
+both gates over the same table of outcomes rather than a comment asserting it.
+
+That test earns its place: hygiene-only runs are already refused by
+`MINIMUM_EVIDENCE`, so the row that actually distinguishes the gates is hygiene
+plus an accepting user — 0.3 of evidence, over the floor, with no build or test
+verdict behind it. Removing the rule fails exactly that row.
+
+**Three documentation defects fixed**, each of which had been concealing this:
+
+- The README claimed "Learning P(success), with calibration safeguards | working".
+- `docs/EVALUATION.md` said the reports are empty "because nothing executes
+  tasks". True when written; `run --execute` has executed tasks since Phase 22,
+  and the stale reason covered for the real one.
+- The README's capability table called the direct HTTP adapter unverified while
+  its own status section and `ADAPTER_VERIFICATION` both said verified. The drift
+  guard checked the adapter's own page, not the README table; it now checks both.
+
+Verified against a real agent on 2026-09-09: seven checks, the new one asserting
+the run left a prediction row in SQLite. It recorded
+`predicted=0.871, actual=1, source=prior`. Every previous run recorded none.
+
+**Behaviour change, stated precisely.** Predictions are now recorded on every
+qualifying run. The safeguard itself is still not live in a default install, and
+this phase does not claim otherwise: `cli/route.ts` scores only predictions whose
+source is `learned`, because pooling them with priors would let good priors
+disguise bad learning. Learning is off by default, so a default install records
+`prior` rows that the gate deliberately ignores. Turn learning on, pass
+`minimumTrainingSamples`, and the rows become `learned` — at which point 100 of
+them let the safeguard reach a verdict and, if the probabilities are measurably
+wrong, withdraw them.
+
+So this phase moves calibration from _structurally impossible_ to _waiting on
+data_, which is a different and much better place to be, but it is not the same
+as "the safeguard now fires".
+
+**Still open, unchanged:** risk-scaled evidence, a `needs-review` outcome, an
+acceptance-criteria input, and any reviewer or external-check interface. See
+Phase 27.
+
+---
+
+## Phase 29 — Validation configuration
 
 Not started. See `docs/ARCHITECTURE.md` §4, item 1. Displaced from 25 by the
 model fleet, and from 27 by Phase 26.
 
 ---
 
-## Phase 29 — Offline policy evaluation
+## Phase 30 — Offline policy evaluation
 
 - Policy replay against historical data (spec section 42). The comparison set
   itself is delivered — see Phase 12 — but replay against recorded _outcomes_

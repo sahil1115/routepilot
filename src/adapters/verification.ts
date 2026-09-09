@@ -299,7 +299,7 @@ export const LOOP_VERIFICATION: LoopVerification = {
     date: '2026-09-09',
     toolVersion: 'Claude Code 2.1.72',
     note:
-      'All six checks passed on Windows, Node 22.18.0, driving claude-haiku-4-5 ' +
+      'All seven checks passed on Windows, Node 22.18.0, driving claude-haiku-4-5 ' +
       'through routeTask() and runTask() with --permission-mode acceptEdits. A real ' +
       'agent fixed the fixture, RoutePilot ran the workspace’s own npm test, and the ' +
       'run reported `succeeded` with testsPassed=true, taskCriteriaMet=null and ' +
@@ -307,6 +307,9 @@ export const LOOP_VERIFICATION: LoopVerification = {
       'learned observation. A workspace declaring no scripts reported `unverified` ' +
       'with taskCriteriaMet null even though the agent had done the work. Recorded ' +
       'from .routepilot/run-loop-verification.json, not from a transcript. ' +
+      'The 2026-09-09 re-run added a seventh check: the run left a prediction row ' +
+      'in SQLite (predicted=0.871, actual=1, source=prior). Every earlier run ' +
+      'recorded none, because nothing called the tracking helper. ' +
       'The 2026-09-08 run of the same six checks recorded taskCriteriaMet=true and ' +
       'evidence=0.5; Phase 27 removed that claim, and the 0.2 it was worth is the ' +
       'whole of the difference. The real evidence -- a passing test suite -- is ' +

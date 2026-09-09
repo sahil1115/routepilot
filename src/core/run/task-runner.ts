@@ -624,12 +624,17 @@ export class TaskRunner {
       // over, and a passing typecheck taught the router the model had done the
       // work at a score of 1.0.
       //
-      // The field stays. `TelemetryRecorder` already takes a caller-supplied
-      // signal, so a real acceptance check can fill it with no schema change.
-      // Until something does, this and `userAccepted` are both permanently
-      // null, which caps achievable `evidence` at 0.65 rather than 1.0 --
-      // `evidence` is a ratio against the whole table, so the floor still
-      // bites, but a reader must not have to work that out for themselves.
+      // The field stays, and the SQLite column with it, so a real acceptance
+      // check needs no schema change. It would need something more than that,
+      // which an earlier version of this comment glossed over: `outcomeRecord`
+      // reads `run.signals.taskCriteriaMet` -- this object -- so there is no
+      // caller-supplied path today. Producing one means a field on `RunRequest`
+      // that does not exist.
+      //
+      // Until then this and `userAccepted` are both permanently null, which caps
+      // achievable `evidence` at 0.65 rather than 1.0. `evidence` is a ratio
+      // against the whole table, so the floor still bites, but a reader must not
+      // have to work that out for themselves.
       taskCriteriaMet: null,
       userCancelled: end.outcome === 'cancelled',
       escalationCount: attempts.filter((attempt) => attempt.viaEscalation).length,

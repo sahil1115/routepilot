@@ -309,7 +309,28 @@ await check('the outcome became a learned observation', ['learning'], () => {
   });
 });
 
-// --- 6. The honesty path ----------------------------------------------------
+await check('the prediction was scored against the outcome', ['calibration'], () => {
+  const store = executed?.store;
+  if (store === undefined) return Promise.resolve({ passed: false, detail: 'no store was opened' });
+
+  // Phase 11 built both halves of this and nothing called either, so
+  // `loadPredictions` came back empty on every real run for six phases and the
+  // calibration safeguard could never reach a verdict. The unit tests all
+  // passed throughout; only driving the production path shows a missing call.
+  const records = store.loadPredictions(10);
+  const first = records[0];
+
+  return Promise.resolve({
+    passed: records.length > 0 && first?.predicted !== undefined && first?.actual !== undefined,
+    detail:
+      `predictions=${records.length}; ` +
+      `model=${first?.modelId ?? 'none'}; ` +
+      `predicted=${String(first?.predicted)}; actual=${String(first?.actual)}; ` +
+      `source=${first?.source ?? 'none'}`,
+  });
+});
+
+// --- 7. The honesty path ----------------------------------------------------
 
 await check(
   'reports unverified when the workspace declares no checks',

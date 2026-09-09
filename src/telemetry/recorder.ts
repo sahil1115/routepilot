@@ -18,6 +18,8 @@
 
 import type { RunResult } from '../core/types/run.js';
 import type { RoutingFeatures } from '../core/types/features.js';
+import type { PredictionStore } from '../core/types/calibration.js';
+import { predictionFromDecision } from '../core/calibration/tracking.js';
 import type {
   CandidateRecord,
   ExecutionAttemptRecord,
@@ -31,7 +33,15 @@ import { redactSummary, stableHash } from './redaction.js';
 
 /** Everything needed to record one run. */
 export interface RecordRunInput {
-  readonly store: TelemetryStore;
+  /**
+   * Where the run is written.
+   *
+   * `recordPredictions` is optional because a caller may supply a plain
+   * `TelemetryStore`. `openTelemetryStore` returns one that has it, so the
+   * production path always scores its predictions; a store without it still
+   * records everything else.
+   */
+  readonly store: TelemetryStore & Partial<Pick<PredictionStore, 'recordPredictions'>>;
   readonly requestId: string;
   /** Hashed, never stored. */
   readonly prompt: string;
@@ -88,6 +98,40 @@ export function recordRun(input: RecordRunInput): void {
   });
 
   store.recordOutcome(outcomeRecord(input, at));
+  recordPrediction(input, at);
+}
+
+/**
+ * Score the probability the router acted on against what happened.
+ *
+ * Phase 11 built both halves of this -- `predictionFromDecision` to pair them
+ * and `recordPredictions` to store them -- and nothing ever called either. So
+ * `loadPredictions` always came back empty, the calibration gate always
+ * returned `NOT_ASSESSED`, and the safeguard that exists to withdraw learned
+ * probabilities when they are measurably wrong could not reach any other
+ * verdict. Six phases of green tests, because the missing piece was a call.
+ *
+ * It lives here rather than at the CLI call site so that no future caller of
+ * `recordRun` can record a run and forget its prediction -- which is the shape
+ * of the original defect.
+ *
+ * `predictionFromDecision` returns `null` whenever the outcome says nothing
+ * about prediction quality, so the refusals live there and are shared with
+ * learning.
+ */
+function recordPrediction(input: RecordRunInput, at: number): void {
+  const { store, run } = input;
+  if (store.recordPredictions === undefined) return;
+  if (run.signals === null || run.score === null) return;
+
+  const record = predictionFromDecision(run.decision, run.signals, run.score, {
+    requestId: input.requestId,
+    scope: input.features.task.scope,
+    at,
+  });
+  if (record === null) return;
+
+  store.recordPredictions([record]);
 }
 
 function requestRecord(input: RecordRunInput, at: number): RequestRecord {

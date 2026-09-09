@@ -5,7 +5,8 @@ it.
 
 **Status: verified** on 2026-09-09 against Claude Code 2.1.72, driving a real
 agent through the production path end to end. First verified 2026-09-08; re-run
-after Phase 27 changed what an outcome may claim.
+after Phase 27 changed what an outcome may claim, and again after Phase 28 added
+prediction recording.
 
 ---
 
@@ -58,17 +59,18 @@ already uses for the same reason.
 
 ## What was verified
 
-Six checks against `https://api.anthropic.com` via Claude Code, on Windows with
+Seven checks against `https://api.anthropic.com` via Claude Code, on Windows with
 Node 22.18.0, using `claude-haiku-4-5` and `--permission-mode acceptEdits`:
 
-| check                                       | what it proves                                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| plans without touching the workspace        | the safe default holds through the real path                                         |
-| the full loop succeeds against a real agent | routing → executor → adapter → real edits → real validation → `succeeded`            |
-| the outcome was earned by a check that ran  | `succeeded` came from a verdict, not the agent's word, and no criterion was invented |
-| the run reached the telemetry database      | a real run is recorded                                                               |
-| the outcome became a learned observation    | the last link in the record-then-learn loop                                          |
-| reports `unverified` when nothing can check | the honesty path, against a real agent                                               |
+| check                                         | what it proves                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| plans without touching the workspace          | the safe default holds through the real path                                         |
+| the full loop succeeds against a real agent   | routing → executor → adapter → real edits → real validation → `succeeded`            |
+| the outcome was earned by a check that ran    | `succeeded` came from a verdict, not the agent's word, and no criterion was invented |
+| the run reached the telemetry database        | a real run is recorded                                                               |
+| the outcome became a learned observation      | the last link in the record-then-learn loop                                          |
+| the prediction was scored against the outcome | a calibration row reaches SQLite; every run before 2026-09-09 recorded none          |
+| reports `unverified` when nothing can check   | the honesty path, against a real agent                                               |
 
 Every assertion observes the filesystem or the SQLite database. Recorded in
 `.routepilot/run-loop-verification.json`, written by the script.
@@ -79,6 +81,17 @@ The third check is where Phase 27 shows up. It requires `testsPassed=true` **and
 records `null` and `0.3`, and the 0.2 between them is exactly the circular claim
 that was removed. The passing test suite is unchanged, and still trains the
 router.
+
+The sixth check is where Phase 28 shows up. `predictionFromDecision` and
+`recordPredictions` were built in Phase 11 and neither had a production caller,
+so every real run before this one left the prediction table empty and the
+calibration safeguard could never reach a verdict. This run recorded
+`predicted=0.871, actual=1, source=prior`.
+
+That `source=prior` is the honest caveat: the safeguard scores only `learned`
+predictions, so a default install with learning off records rows the gate
+ignores by design. Calibration is now waiting on data rather than structurally
+impossible, which is not the same as saying it fires.
 
 ### Limitations: what was not verified
 

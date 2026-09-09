@@ -20,7 +20,7 @@ import type { PredictionRecord, PredictionSource } from '../types/calibration.js
 import type { TaskScope } from '../types/features.js';
 import type { RoutingDecision } from '../types/routing.js';
 import type { TaskOutcome, TaskSuccessScore } from '../types/outcome.js';
-import { MINIMUM_EVIDENCE } from '../learning/success-model.js';
+import { MINIMUM_EVIDENCE, hasSubstantiveEvidence } from '../learning/success-model.js';
 
 /** What the caller must supply alongside a decision to score it. */
 export interface TrackingContext {
@@ -39,10 +39,19 @@ export interface TrackingContext {
  * - **Nothing was selected.** No prediction was acted on.
  * - **Nothing was evaluated.** `score === null` is unknown, not failure.
  * - **Too little evidence** to trust the score itself.
+ * - **No substantive check ran.** A typecheck says the code parses, which is
+ *   equally true of code that does the wrong thing; scoring a prediction
+ *   against it would measure the router's accuracy on evidence that establishes
+ *   nothing.
  * - **Not the model's fault.** A provider outage says nothing about whether the
  *   success probability was well calibrated (spec section 2, rule 10).
  * - **The task escalated.** More than one model ran, so the outcome cannot be
  *   attributed to the prediction made about any one of them.
+ *
+ * The parity with learning is enforced by sharing `hasSubstantiveEvidence` and
+ * by a test that runs both gates over the same table. It used to be asserted
+ * only by this comment, and Phase 27 broke it -- a rule was added to learning
+ * and not here -- without anything failing.
  */
 export function predictionFromDecision(
   decision: RoutingDecision,
@@ -56,6 +65,7 @@ export function predictionFromDecision(
   if (!score.modelAttributable) return null;
   if (score.score === null) return null;
   if (score.evidence < MINIMUM_EVIDENCE) return null;
+  if (!hasSubstantiveEvidence(outcome)) return null;
   if (outcome.escalationCount > 0) return null;
   if (outcome.modelsUsed.length !== 1) return null;
 

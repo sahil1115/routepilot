@@ -40,7 +40,7 @@ what it expects to cost.
 >   the model nothing — the run output says so in as many words.
 > - **The VS Code extension runs in real VS Code** (1.136.0, Node 24.18.1):
 >   8/8 extension-host checks, plus 19 against a fake host.
-> - **1467 tests across 71 files**, and `npm run gate` maps every quality-gate
+> - **1486 tests across 72 files**, and `npm run gate` maps every quality-gate
 >   item to the evidence for it.
 >
 > **Still in progress**
@@ -196,20 +196,21 @@ Requires Node ≥ 20.11.
 
 ## What is built
 
-| capability                                                                                  | state                               |
-| ------------------------------------------------------------------------------------------- | ----------------------------------- |
-| Task classification and progressive repository analysis                                     | working                             |
-| Expected-cost routing with hard constraints and budgets                                     | working                             |
-| CLI: `route`, `analyze`, `models`, `providers`, `config`, `status`, `calibration`, `shadow` | working                             |
-| Failure taxonomy, execution monitor, validation engine                                      | working                             |
-| Escalation graph with compact handoffs                                                      | working                             |
-| Outcome model and local SQLite telemetry                                                    | working                             |
-| Learning P(success), with calibration safeguards                                            | working, **off by default**         |
-| Shadow policies and a contextual bandit                                                     | working, **off by default**         |
-| Task runner joining the whole pipeline                                                      | working, driven by `routepilot run` |
-| VS Code extension                                                                           | **verified in real VS Code 1.136**  |
-| Agent adapters: Claude Code, Cursor                                                         | **verified against the real tool**  |
-| Agent adapters: direct HTTP                                                                 | implemented, **unverified**         |
+| capability                                                                                  | state                                   |
+| ------------------------------------------------------------------------------------------- | --------------------------------------- |
+| Task classification and progressive repository analysis                                     | working                                 |
+| Expected-cost routing with hard constraints and budgets                                     | working                                 |
+| CLI: `route`, `analyze`, `models`, `providers`, `config`, `status`, `calibration`, `shadow` | working                                 |
+| Failure taxonomy, execution monitor, validation engine                                      | working                                 |
+| Escalation graph with compact handoffs                                                      | working                                 |
+| Outcome model and local SQLite telemetry                                                    | working                                 |
+| Learning P(success), with calibration safeguards                                            | working, **off by default**             |
+| Predictions scored against outcomes for calibration                                         | working, **inert until learning is on** |
+| Shadow policies and a contextual bandit                                                     | working, **off by default**             |
+| Task runner joining the whole pipeline                                                      | working, driven by `routepilot run`     |
+| VS Code extension                                                                           | **verified in real VS Code 1.136**      |
+| Agent adapters: Claude Code, Cursor                                                         | **verified against the real tool**      |
+| Agent adapters: direct HTTP                                                                 | **verified against the real API**       |
 
 ---
 
@@ -222,8 +223,9 @@ The ones that would matter most if you were considering using this:
    no real run has produced one — the fixture ships a failing test, so it cannot
    trigger the one classification that escalates. Cursor also reports no token
    usage, so its costs are estimates rather than measurements.
-2. **The loop is verified on Windows, through Claude Code, twice.** Six checks
-   passed end to end on 2026-09-08 and again on 2026-09-09 — see
+2. **The loop is verified on Windows, through Claude Code, three times.** Six
+   checks passed end to end on 2026-09-08, six again on 2026-09-09, and seven on
+   2026-09-09 after prediction recording was added — see
    [docs/RUN_LOOP.md](docs/RUN_LOOP.md). Budget enforcement across real
    attempts, retry and provider fallback against a real agent, and any other
    platform remain unconfirmed.
