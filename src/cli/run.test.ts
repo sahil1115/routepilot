@@ -550,3 +550,61 @@ describe('exit codes distinguish unverified from broken', () => {
     expect(described?.[1]).toMatch(/nothing validated it/i);
   });
 });
+
+describe('the output says what earned the status', () => {
+  /** A real run, with its recorded signals replaced to pose one question. */
+  async function renderedWith(signals: Record<string, boolean | null>) {
+    const result = await runTask({
+      ...BASE,
+      route: routeResult(),
+      registry: fakeRegistry(),
+      execute: true,
+    });
+    const run = result.run;
+    if (run === null) throw new Error('expected a run');
+
+    return renderRun({
+      ...result,
+      run: { ...run, signals: { ...run.signals, ...signals } as typeof run.signals },
+    });
+  }
+
+  it('names nothing when no check produced a verdict', async () => {
+    const result = await runTask({
+      ...BASE,
+      route: routeResult(),
+      registry: fakeRegistry(),
+      execute: true,
+    });
+
+    expect(renderRun(result)).toContain('no check produced a verdict');
+  });
+
+  it('names the checks that produced verdicts', async () => {
+    const rendered = await renderedWith({ syntaxValid: true, testsPassed: true });
+
+    expect(rendered).toContain('syntax passed');
+    expect(rendered).toContain('tests passed');
+  });
+
+  it('reports a failing check as failed, not as absent', async () => {
+    const rendered = await renderedWith({ testsPassed: false });
+
+    expect(rendered).toContain('tests failed');
+  });
+
+  it('warns when only hygiene checks ran', async () => {
+    // The case the whole phase exists for. Without this line a run a lone
+    // typecheck vouched for prints identically to one a full suite did.
+    const rendered = await renderedWith({ syntaxValid: true });
+
+    expect(rendered).toContain('syntax passed');
+    expect(rendered).toMatch(/does not train the router/i);
+  });
+
+  it('does not warn when a substantive check ran', async () => {
+    const rendered = await renderedWith({ syntaxValid: true, buildPassed: true });
+
+    expect(rendered).not.toMatch(/does not train the router/i);
+  });
+});

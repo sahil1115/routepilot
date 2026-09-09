@@ -66,6 +66,31 @@ export const DEFAULT_PRIOR_STRENGTH = 12;
  */
 export const MINIMUM_EVIDENCE = 0.25;
 
+/**
+ * Checks that can support an observation on their own.
+ *
+ * Syntax and lint are hygiene. They establish that the code parses and is tidy,
+ * both of which are equally true of code that does entirely the wrong thing, so
+ * neither is evidence a *task* was done. Build and tests are: they exercise the
+ * change against the rest of the repository.
+ *
+ * The rule asks whether one of these produced a **verdict**, not whether it
+ * passed. A failing test suite is exactly as informative as a passing one, and
+ * admitting only successes would teach the router that every model always
+ * succeeds — a worse corruption than the one this exists to prevent.
+ *
+ * Named here rather than folded into {@link MINIMUM_EVIDENCE} because the two
+ * ask different questions. The floor asks *how much* of the evidence was
+ * available; this asks whether any of it bore on the task. A run can clear the
+ * floor on hygiene alone, and one did.
+ */
+export const SUBSTANTIVE_CHECKS = ['build', 'tests'] as const;
+
+/** Whether any check that bears on the task produced a verdict. */
+function hasSubstantiveEvidence(outcome: TaskOutcome): boolean {
+  return outcome.buildPassed !== null || outcome.testsPassed !== null;
+}
+
 /** How the learned model may be used. */
 export interface LearningPolicy {
   /** Whether learned estimates may influence routing at all. */
@@ -425,13 +450,14 @@ function isUsable(stats: LearnedStats): boolean {
  * Derive an observation from a scored outcome, or refuse to.
  *
  * Returns `null` — meaning "this teaches us nothing about any single model" —
- * in four cases, each required by the specification:
+ * in five cases:
  *
  * - **Not model-attributable.** A provider outage or a broken environment says
  *   nothing about model capability (spec section 2, rule 10).
  * - **Nothing was evaluated.** `score === null` is unknown, not failure.
  *   Recording it as a zero would slander every model it touched.
  * - **Too little evidence.** See {@link MINIMUM_EVIDENCE}.
+ * - **No substantive check ran.** See {@link SUBSTANTIVE_CHECKS}.
  * - **More than one model was involved.** After an escalation there is no
  *   honest way to say which model's work produced the result. Splitting the
  *   credit would be inventing data; assigning it to one of them would be worse.
@@ -444,6 +470,7 @@ export function observationFromOutcome(
   if (!score.modelAttributable) return null;
   if (score.score === null) return null;
   if (score.evidence < MINIMUM_EVIDENCE) return null;
+  if (!hasSubstantiveEvidence(outcome)) return null;
   if (outcome.escalationCount > 0) return null;
   if (outcome.modelsUsed.length !== 1) return null;
 

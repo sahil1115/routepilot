@@ -296,17 +296,21 @@ export const LOOP_VERIFICATION: LoopVerification = {
     'From a terminal: npm run verify:run-loop -- --model anthropic/haiku ' +
     '--permission-mode acceptEdits',
   evidence: {
-    date: '2026-09-08',
+    date: '2026-09-09',
     toolVersion: 'Claude Code 2.1.72',
     note:
       'All six checks passed on Windows, Node 22.18.0, driving claude-haiku-4-5 ' +
       'through routeTask() and runTask() with --permission-mode acceptEdits. A real ' +
       'agent fixed the fixture, RoutePilot ran the workspace’s own npm test, and the ' +
-      'run reported `succeeded` with testsPassed=true, taskCriteriaMet=true and ' +
-      'evidence=0.5 -- one request, one attempt and one outcome in SQLite, and one ' +
+      'run reported `succeeded` with testsPassed=true, taskCriteriaMet=null and ' +
+      'evidence=0.3 -- one request, one attempt and one outcome in SQLite, and one ' +
       'learned observation. A workspace declaring no scripts reported `unverified` ' +
       'with taskCriteriaMet null even though the agent had done the work. Recorded ' +
-      'from .routepilot/run-loop-verification.json, not from a transcript.',
+      'from .routepilot/run-loop-verification.json, not from a transcript. ' +
+      'The 2026-09-08 run of the same six checks recorded taskCriteriaMet=true and ' +
+      'evidence=0.5; Phase 27 removed that claim, and the 0.2 it was worth is the ' +
+      'whole of the difference. The real evidence -- a passing test suite -- is ' +
+      'unchanged, and still enough to train the router.',
   },
   limitations: [
     'FOUND BY THIS: on Windows every validation command failed to start, because ' +
@@ -324,5 +328,10 @@ export const LOOP_VERIFICATION: LoopVerification = {
       'Windows.',
     'Verified through Claude Code only. The same script accepts --adapter ' +
       'cursor-cli, which has not been run.',
+    'OBSERVED 2026-09-09: the script completes its checks and writes its report in ' +
+      'about 40 seconds, then keeps the Node process alive for many minutes before ' +
+      'exiting -- something holds a handle open after the last check. Harmless to ' +
+      'the result, which is written before the delay, but it would stall a CI job ' +
+      'that waits for the process.',
   ],
 };

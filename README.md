@@ -21,7 +21,7 @@ what it expects to cost.
 > - **The direct HTTP adapter is verified too**, on 2026-09-06 against the
 >   Anthropic Messages API: 4/4, including a real streamed request reporting
 >   token usage. See [docs/DIRECT_PROVIDER.md](docs/DIRECT_PROVIDER.md).
-> - **The whole loop works end to end** (2026-09-08). A real agent fixed a
+> - **The whole loop works end to end** (2026-09-09). A real agent fixed a
 >   fixture, RoutePilot ran the workspace's own tests, and the run reported
 >   `succeeded` with the outcome recorded and learned from — routing, execution,
 >   validation, telemetry and learning in one pass. See
@@ -34,9 +34,13 @@ what it expects to cost.
 > - **It will not claim a success it did not check.** A run reports `unverified`
 >   rather than `succeeded` when your workspace declares no test, build or
 >   typecheck script. RoutePilot never takes the agent's word for it.
+> - **And it will not learn from a run it did not really check.** An outcome
+>   only trains the router if a build or a test suite actually returned a
+>   verdict. A passing typecheck is not evidence a task was done, so it earns
+>   the model nothing — the run output says so in as many words.
 > - **The VS Code extension runs in real VS Code** (1.136.0, Node 24.18.1):
 >   8/8 extension-host checks, plus 19 against a fake host.
-> - **1456 tests across 70 files**, and `npm run gate` maps every quality-gate
+> - **1467 tests across 71 files**, and `npm run gate` maps every quality-gate
 >   item to the evidence for it.
 >
 > **Still in progress**
@@ -218,8 +222,8 @@ The ones that would matter most if you were considering using this:
    no real run has produced one — the fixture ships a failing test, so it cannot
    trigger the one classification that escalates. Cursor also reports no token
    usage, so its costs are estimates rather than measurements.
-2. **The loop is verified on Windows, through Claude Code, once.** Six checks
-   passed end to end on 2026-09-08 — see
+2. **The loop is verified on Windows, through Claude Code, twice.** Six checks
+   passed end to end on 2026-09-08 and again on 2026-09-09 — see
    [docs/RUN_LOOP.md](docs/RUN_LOOP.md). Budget enforcement across real
    attempts, retry and provider fallback against a real agent, and any other
    platform remain unconfirmed.
@@ -242,6 +246,13 @@ The ones that would matter most if you were considering using this:
    Real usage ran at 0.68x the configured price, and the bound sat above that
    mean — conservative, as designed. Six runs on one model is evidence that the
    mechanism works, not that any particular price table is right.
+9. **Nothing detects semantic incorrectness.** A model that writes code passing
+   every check while doing entirely the wrong thing is still recorded as a
+   success. RoutePilot refuses to treat hygiene checks — syntax, lint — as proof
+   a task was done, and refuses to learn from a run no build or test suite
+   vouched for. Beyond that it has no independent notion of whether the work was
+   right, and closing that needs task-specific acceptance criteria, which
+   nothing produces today.
 
 ---
 

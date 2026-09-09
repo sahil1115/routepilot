@@ -611,10 +611,26 @@ export class TaskRunner {
       lintPassed: checks.lint,
       buildPassed: checks.build,
       testsPassed: checks.tests,
-      // `null` for an unverified run: nobody established the criteria were met,
-      // and recording `true` here would feed the same unfounded claim into
-      // scoring, learning and calibration.
-      taskCriteriaMet: end.outcome === 'succeeded' ? true : end.outcome === 'failed' ? false : null,
+      // Always `null`: nothing in RoutePilot establishes that the work did what
+      // was asked, so "not evaluated" is the only honest value.
+      //
+      // This was derived from the run's own outcome, which made it circular.
+      // `succeeded` means "some check produced a verdict and nothing failed",
+      // so the dimension that means *the task was done* -- 0.2 of the weight
+      // table, second-heaviest -- restated the checks instead of adding to
+      // them. A task planning `['syntax', 'tests']` in a repository with a
+      // typecheck script and no test script is 0.1 of evidence on its own,
+      // under the 0.25 floor and rightly refused; the circular 0.2 carried it
+      // over, and a passing typecheck taught the router the model had done the
+      // work at a score of 1.0.
+      //
+      // The field stays. `TelemetryRecorder` already takes a caller-supplied
+      // signal, so a real acceptance check can fill it with no schema change.
+      // Until something does, this and `userAccepted` are both permanently
+      // null, which caps achievable `evidence` at 0.65 rather than 1.0 --
+      // `evidence` is a ratio against the whole table, so the floor still
+      // bites, but a reader must not have to work that out for themselves.
+      taskCriteriaMet: null,
       userCancelled: end.outcome === 'cancelled',
       escalationCount: attempts.filter((attempt) => attempt.viaEscalation).length,
       modelsUsed: [...new Set(attempts.map((attempt) => attempt.modelId))],

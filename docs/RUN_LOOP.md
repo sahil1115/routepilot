@@ -3,8 +3,9 @@
 What `routepilot run --execute` actually does, and what has been observed doing
 it.
 
-**Status: verified** on 2026-09-08 against Claude Code 2.1.72, driving a real
-agent through the production path end to end.
+**Status: verified** on 2026-09-09 against Claude Code 2.1.72, driving a real
+agent through the production path end to end. First verified 2026-09-08; re-run
+after Phase 27 changed what an outcome may claim.
 
 ---
 
@@ -60,17 +61,24 @@ already uses for the same reason.
 Six checks against `https://api.anthropic.com` via Claude Code, on Windows with
 Node 22.18.0, using `claude-haiku-4-5` and `--permission-mode acceptEdits`:
 
-| check                                       | what it proves                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------- |
-| plans without touching the workspace        | the safe default holds through the real path                              |
-| the full loop succeeds against a real agent | routing → executor → adapter → real edits → real validation → `succeeded` |
-| the outcome was earned by a check that ran  | `succeeded` came from a verdict, not the agent's word                     |
-| the run reached the telemetry database      | a real run is recorded                                                    |
-| the outcome became a learned observation    | the last link in the record-then-learn loop                               |
-| reports `unverified` when nothing can check | the honesty path, against a real agent                                    |
+| check                                       | what it proves                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| plans without touching the workspace        | the safe default holds through the real path                                         |
+| the full loop succeeds against a real agent | routing → executor → adapter → real edits → real validation → `succeeded`            |
+| the outcome was earned by a check that ran  | `succeeded` came from a verdict, not the agent's word, and no criterion was invented |
+| the run reached the telemetry database      | a real run is recorded                                                               |
+| the outcome became a learned observation    | the last link in the record-then-learn loop                                          |
+| reports `unverified` when nothing can check | the honesty path, against a real agent                                               |
 
 Every assertion observes the filesystem or the SQLite database. Recorded in
 `.routepilot/run-loop-verification.json`, written by the script.
+
+The third check is where Phase 27 shows up. It requires `testsPassed=true` **and
+`taskCriteriaMet=null`** — real evidence present, invented evidence absent. The
+2026-09-08 run recorded `taskCriteriaMet=true` and `evidence=0.5`; this one
+records `null` and `0.3`, and the 0.2 between them is exactly the circular claim
+that was removed. The passing test suite is unchanged, and still trains the
+router.
 
 ### Limitations: what was not verified
 

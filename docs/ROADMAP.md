@@ -54,8 +54,9 @@ and had drifted out of step with the code; it was corrected in Phase 9.
 | 24    | `run --execute` honours plan and budget | **Complete**              |
 | 25    | User-defined model fleet                | **Complete**              |
 | 26    | End-to-end verification of the loop     | **Complete**              |
-| 27    | Offline policy evaluation               | Not started               |
+| 27    | Learning requires substantive evidence  | **Complete**              |
 | 28    | Validation configuration                | Not started               |
+| 29    | Offline policy evaluation               | Not started               |
 
 Phases 10 and 11 of the _original_ roadmap (validation engine, telemetry schema)
 were folded into Phases 6 and 8 respectively and are complete. Roadmap Phase 12
@@ -958,14 +959,76 @@ fixture ships a failing test, so it cannot trigger a vertical escalation.
 
 ---
 
-## Phase 28 — Validation configuration
+## Phase 27 — Learning requires substantive evidence (complete)
 
-Not started. See `docs/ARCHITECTURE.md` §4, item 1. Displaced from 25 by the
-model fleet, and from 27 by this phase.
+A review argued that model confidence is not verification confidence: an agent
+can exit 0 with a green build and still not have done the work, and if
+RoutePilot rewards that it corrupts its own routing. The diagnosis was right,
+and the defect was live.
+
+`taskCriteriaMet` — "the task did what was asked", 0.2 of the outcome weight
+table and second-heaviest in it — was derived from the run's own outcome. But
+`succeeded` means only "some check produced a verdict and nothing failed", so
+the dimension restated the checks rather than adding to them.
+
+That mattered because of what it did to the evidence ratio. A task planning
+`['syntax', 'tests']` in a repository with a typecheck script and no test script
+runs syntax alone: 0.1 of the weight table, under the 0.25 `MINIMUM_EVIDENCE`
+floor, and rightly refused. The circular 0.2 carried it over. **A passing
+typecheck taught the router the model had done the work, at a score of 1.0** —
+and the floor that was supposed to prevent exactly this was measuring a
+restatement of itself.
+
+Two changes:
+
+- `taskCriteriaMet` is always `null` from the runner. Nothing in RoutePilot
+  independently establishes it. The field stays, and `TelemetryRecorder` already
+  accepts a caller-supplied signal, so a real acceptance check can fill it with
+  no schema change.
+- A fifth admission rule in `observationFromOutcome`: a **substantive** check —
+  a build or a test suite — must have produced a verdict. Syntax and lint are
+  hygiene, equally true of code that does the wrong thing. The rule asks for a
+  verdict rather than a pass, so a failing suite still teaches; admitting only
+  successes would have taught the router that every model always succeeds.
+
+`run --execute` now names the checks that earned its status, and says outright
+when a run is too thinly evidenced to train the router.
+
+**Deliberately not built.** No new verdict enum, no second confidence score, no
+reviewer or external-check fields, no schema change. The review proposed a
+five-value `VerificationVerdict` alongside the existing `RunOutcome`,
+`FailureType`, `CalibrationVerdict` and `ValidationReport` — a second vocabulary
+for facts already recorded — plus `reviewer` and `externalChecks` fields with no
+producer. `userAccepted` has been declared and never set since Phase 8; adding
+two more of those would repeat the pattern, not fix it.
+
+**Still open, from the same review:** risk-scaled evidence, where high-risk work
+(security, migration, architecture) requires a test verdict rather than merely a
+build. `features.task.risk` and `hazards` already exist to support it. Left out
+because it is a policy judgement with no measured evidence behind it, and this
+phase was about removing an unfounded claim rather than adding one.
+
+**Limitation, unchanged by any of this:** nothing here detects semantic
+incorrectness. A model that writes code passing every test while doing the wrong
+thing is still recorded as a success. What changed is that hygiene checks are no
+longer treated as proof of task completion. Closing the rest needs task-specific
+acceptance criteria, which nothing produces today.
+
+**The evidence ceiling this exposes.** With `taskCriteriaMet` and `userAccepted`
+both permanently unset, the maximum `evidence` a real run can reach is 0.65, not
+1.0. The 25% floor still bites, but a reported 0.5 is two thirds of the
+reachable evidence rather than half of it.
 
 ---
 
-## Phase 27 — Offline policy evaluation
+## Phase 28 — Validation configuration
+
+Not started. See `docs/ARCHITECTURE.md` §4, item 1. Displaced from 25 by the
+model fleet, and from 27 by Phase 26.
+
+---
+
+## Phase 29 — Offline policy evaluation
 
 - Policy replay against historical data (spec section 42). The comparison set
   itself is delivered — see Phase 12 — but replay against recorded _outcomes_

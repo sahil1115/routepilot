@@ -255,11 +255,21 @@ await check(
     // view that reaches scoring, learning and telemetry, so `testsPassed: true`
     // here means a real check produced a verdict the rest of the system then
     // acted on -- which is the claim `succeeded` rests on.
+    //
+    // `taskCriteriaMet` must be null even on this, the success path. It used to
+    // be set to true from the run's own outcome, which made the dimension that
+    // means "the task was done" a restatement of the checks -- and that
+    // circular 0.2 was enough to carry a syntax-only run over the evidence
+    // floor. Phase 27. The two assertions together are the point: real evidence
+    // present, invented evidence absent.
     const run = executed?.result.run;
     const signals = run?.signals;
 
     return Promise.resolve({
-      passed: signals?.testsPassed === true && (run?.score?.evidence ?? 0) > 0,
+      passed:
+        signals?.testsPassed === true &&
+        signals?.taskCriteriaMet === null &&
+        (run?.score?.evidence ?? 0) > 0,
       detail:
         `testsPassed=${String(signals?.testsPassed)}; ` +
         `syntaxValid=${String(signals?.syntaxValid)}; ` +

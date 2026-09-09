@@ -115,7 +115,13 @@ describe('a run nobody validated is not a success', () => {
     );
 
     expect(result.outcome).toBe('succeeded');
-    expect(result.signals?.taskCriteriaMet).toBe(true);
+    // The passing suite is what earns it, and it is recorded as itself.
+    // `taskCriteriaMet` stays null even here: a green suite is evidence about
+    // the suite, and reading it as "the task did what was asked" is the
+    // circularity that let a lone typecheck train the router. See
+    // `evidence-admission.test.ts`.
+    expect(result.signals?.testsPassed).toBe(true);
+    expect(result.signals?.taskCriteriaMet).toBeNull();
   });
 
   it('still reports `succeeded` when no validation engine is wired at all', async () => {

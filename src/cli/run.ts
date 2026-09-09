@@ -509,6 +509,10 @@ function outcomeSection(
     ['attempts', String(run.attempts.length)],
     ['total cost', money(run.totalCost, currency)],
     ['reason', run.reason],
+    // What actually earned the status. `succeeded` on a lone typecheck and
+    // `succeeded` on a full suite print identically otherwise, and they are not
+    // remotely the same claim.
+    ['verified by', describeEvidence(run)],
   ];
   // An overspend is printed, never implied. This line is the difference between
   // exceeding a budget and exceeding it silently.
@@ -527,6 +531,40 @@ function outcomeSection(
 
   return `Outcome
 ${block(entries)}`;
+}
+
+/**
+ * Which checks produced a verdict, and whether they were enough to learn from.
+ *
+ * A status line alone cannot separate a run a full test suite vouched for from
+ * one a typecheck did. Both read `succeeded`, and only the first is real
+ * evidence the task was done — so the checks are named, and a run that cannot
+ * train the router says so rather than leaving the reader to assume it did.
+ */
+function describeEvidence(run: RunResult): string {
+  const signals = run.signals;
+  if (signals === null) return 'nothing ran';
+
+  const verdicts: [string, boolean | null][] = [
+    ['syntax', signals.syntaxValid],
+    ['lint', signals.lintPassed],
+    ['build', signals.buildPassed],
+    ['tests', signals.testsPassed],
+  ];
+
+  const ran = verdicts
+    .filter((entry): entry is [string, boolean] => entry[1] !== null)
+    .map(([check, passed]) => `${check} ${passed ? 'passed' : 'failed'}`);
+
+  if (ran.length === 0) return 'nothing — no check produced a verdict';
+
+  // Mirrors `SUBSTANTIVE_CHECKS`: syntax and lint say the code parses and is
+  // tidy, which is equally true of code that does the wrong thing.
+  const substantive = signals.buildPassed !== null || signals.testsPassed !== null;
+
+  return substantive
+    ? ran.join(', ')
+    : `${ran.join(', ')} — no build or test ran, so this run does not train the router`;
 }
 
 function attemptsSection(run: RunResult, currency: string): string {

@@ -94,11 +94,42 @@ An outcome is admitted only if **all** of these hold:
   cancellation
 - something was actually evaluated (`score !== null`; unknown is not failure)
 - the score rests on at least 25% of the possible evidence
+- a **substantive check produced a verdict** — a build or a test suite, not
+  syntax or lint alone
 - **exactly one model was involved** — after an escalation there is no honest
   way to say whose work produced the result
 
 That last rule is a real limitation, not an oversight. Splitting the credit
 would be inventing data; assigning it to one model would be worse.
+
+### Why "substantive"
+
+Syntax and lint establish that the code parses and is tidy. Both are equally
+true of code that does entirely the wrong thing, so neither is evidence a
+_task_ was done. The rule asks whether a build or test suite produced a
+**verdict**, not whether it passed — a failing suite is exactly as informative
+as a passing one, and admitting only successes would teach the router that
+every model always succeeds.
+
+This rule was added because the evidence floor above was not doing the work it
+appeared to. `taskCriteriaMet` — "the task did what was asked", 0.2 of the
+weight table — used to be derived from the run's own outcome, and `succeeded`
+means only "some check produced a verdict and nothing failed". So the dimension
+restated the checks rather than adding to them, and a task planning
+`['syntax', 'tests']` in a repository with a typecheck script and no test
+script cleared the 25% floor on a passing typecheck plus 0.2 of itself. A lone
+typecheck trained the router at a score of 1.0.
+
+`taskCriteriaMet` is now always `null` from the runner. Nothing in RoutePilot
+independently establishes it.
+
+### The evidence ceiling
+
+With `taskCriteriaMet` and `userAccepted` both permanently unset — no
+acceptance check and no accept/reject signal exists to produce them — the
+maximum `evidence` a real run can reach is **0.65**, not 1.0. `evidence` is a
+ratio against the full weight table, so the 25% floor still bites; but a
+reported 0.5 means two thirds of the reachable evidence, not half of it.
 
 ---
 
